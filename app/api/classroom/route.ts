@@ -513,6 +513,7 @@ export async function POST(req: NextRequest) {
         { data: roles },
         { data: reflections },
         { data: activityRecords },
+        { data: allMessages },
       ] = await Promise.all([
         supabase
           .from("members")
@@ -525,12 +526,18 @@ export async function POST(req: NextRequest) {
           .in("group_id", safeIds),
         supabase.from("reflections").select("*").in("group_id", safeIds),
         supabase.from("activity_records").select("*").in("group_id", safeIds),
+        supabase
+          .from("messages")
+          .select("*")
+          .in("group_id", safeIds)
+          .order("created_at"),
       ]);
 
       const groupsView = (groups || []).map((g) => ({
         ...g,
         members: (allMembers || []).filter((m) => m.group_id === g.id),
         roles: (roles || []).filter((r) => r.group_id === g.id),
+        messages: (allMessages || []).filter((m) => m.group_id === g.id),
         reflectionCount: (reflections || []).filter(
           (r) => r.group_id === g.id
         ).length,

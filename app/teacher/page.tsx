@@ -66,9 +66,19 @@ type Role = {
   role_name: string;
 };
 
+type Message = {
+  id: string;
+  group_id: string;
+  role: "user" | "assistant";
+  sender_name: string | null;
+  content: string;
+  created_at: string;
+};
+
 type GroupView = Group & {
   members: Member[];
   roles: Role[];
+  messages: Message[];
   reflectionCount: number;
   activityCount: number;
 };
@@ -92,6 +102,7 @@ export default function TeacherPage() {
   const [activityRecords, setActivityRecords] = useState<ActivityRecord[]>([]);
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [viewingStudent, setViewingStudent] = useState<Member | null>(null);
+  const [viewingGroupChat, setViewingGroupChat] = useState<string | null>(null);
 
   const [title, setTitle] = useState("AI 다문화 동료와 함께하는 모둠활동");
   const [topic, setTopic] = useState("모두가 참여할 수 있는 학교 축제 만들기");
@@ -309,6 +320,11 @@ export default function TeacherPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "activity_records" },
+        refetch
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
         refetch
       )
       .subscribe();
@@ -608,6 +624,7 @@ export default function TeacherPage() {
                           onDelete={() => deleteGroup(g.id)}
                           onUnassign={unassignMember}
                           onViewStudent={(m) => setViewingStudent(m)}
+                          onViewChat={() => setViewingGroupChat(g.id)}
                         />
                       ))}
                     </div>
@@ -618,6 +635,16 @@ export default function TeacherPage() {
           </section>
         </div>
       </div>
+
+      {/* 모둠 채팅 모달 */}
+      {viewingGroupChat && (
+        <GroupChatModal
+          group={
+            groups.find((g) => g.id === viewingGroupChat) || null
+          }
+          onClose={() => setViewingGroupChat(null)}
+        />
+      )}
 
       {/* 학생 제출물 모달 */}
       {viewingStudent && (
@@ -670,6 +697,7 @@ function GroupCard({
   onDelete,
   onUnassign,
   onViewStudent,
+  onViewChat,
 }: {
   group: GroupView;
   onUpdate: (patch: {
@@ -681,6 +709,7 @@ function GroupCard({
   onDelete: () => void;
   onUnassign: (memberId: string) => void;
   onViewStudent: (member: Member) => void;
+  onViewChat: () => void;
 }) {
   const [name, setName] = useState(group.name);
   const [capacity, setCapacity] = useState(group.capacity);
@@ -811,11 +840,97 @@ function GroupCard({
         )}
       </div>
 
-      <p className="text-[10px] text-slate-400">
-        활동 기록 {group.activityCount}명 · 성찰문 {group.reflectionCount}명
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-slate-400">
+          채팅 {group.messages.length}건 · 활동 기록 {group.activityCount}명 · 성찰문 {group.reflectionCount}명
+        </p>
+        <button
+          onClick={onViewChat}
+          className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+        >
+          채팅 보기
+        </button>
+      </div>
     </article>
   );
+}
+
+function GroupChatModal({
+  group,
+  onClose,
+}: {
+  group: GroupView | null;
+  onClose: () => void;
+}) {
+  if (!group) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div>
+            <p className="text-xs font-semibold text-indigo-600">
+              {group.name} · AI {group.persona_name} ({personaLabel(group.persona_type)})
+            </p>
+            <h2 className="text-xl font-bold text-slate-900">모둠 채팅 — {group.messages.length}건</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-slate-50 px-4 py-4">
+          {group.messages.length === 0 ? (
+            <p className="rounded-lg bg-white px-4 py-3 text-sm text-slate-400">
+              아직 채팅이 없습니다.
+            </p>
+          ) : (
+            group.messages.map((m) => (
+              <div
+                key={m.id}
+                className={`rounded-xl p-3 text-sm leading-6 ${
+                  m.role === "assistant"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "ml-auto max-w-[85%] bg-slate-900 text-white"
+                }`}
+              >
+                <p className="mb-0.5 flex items-center gap-2 text-[10px] opacity-70">
+                  <span className="font-bold">
+                    {m.role === "assistant"
+                      ? `${m.sender_name || group.persona_name} · AI`
+                      : m.sender_name || "익명"}
+                  </span>
+                  <span>{new Date(m.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+                </p>
+                <p className="whitespace-pre-wrap">{m.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function personaLabel(t: string) {
+  switch (t) {
+    case "language":
+      return "언어 적응형";
+    case "culture":
+      return "문화 오해형";
+    case "belonging":
+      return "소속감 고민형";
+    default:
+      return t;
+  }
 }
 
 function StudentSubmissionsModal({

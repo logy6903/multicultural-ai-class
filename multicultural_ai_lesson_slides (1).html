@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 다문화 동료 기반 협력학습 — 발표 슬라이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root {
+  --bg: #FAF7EF;
+  --bg-card: #FFFFFF;
+  --text-primary: #1F1F1E;
+  --text-secondary: #5F5E5A;
+  --text-tertiary: #888780;
+  --accent-teal: #0F6E56;
+  --accent-amber: #854F0B;
+  --accent-purple: #534AB7;
+  --border-subtle: #E8E5DD;
+  --font-heading: 'Gowun Batang', serif;
+  --font-body: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-body);
+  background: #1A1A18;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern", "liga";
+}
+.slide {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+.slide__content {
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  container-type: size;
+  container-name: slide;
+  position: relative;
+  overflow: hidden;
+  padding: 6.5cqh 6.5cqw;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.slide__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 2cqh;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-teal);
+}
+.slide__title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 9cqh;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.slide__subtitle {
+  font-size: 3.2cqh;
+  color: var(--text-secondary);
+  font-weight: 400;
+  line-height: 1.55;
+  max-width: 75cqw;
+}
+.slide__section-num {
+  font-family: var(--font-mono);
+  font-size: 2cqh;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  color: var(--accent-teal);
+  display: block;
+  margin-bottom: 1.5cqh;
+}
+.slide__section-title {
+  font-family: var(--font-heading);
+  font-size: 6cqh;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+.slide__lead {
+  font-size: 3.4cqh;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-weight: 400;
+}
+.slide__body {
+  font-size: 2.8cqh;
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+.slide--title .slide__content { justify-content: center; }
+.slide--title .slide__title { margin: 3cqh 0 2.5cqh; }
+.slide--title .slide__meta {
+  margin-top: 5cqh;
+  padding-top: 3cqh;
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 1.9cqh;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  display: flex;
+  gap: 3.5cqw;
+}
+.slide__header { margin-bottom: 4cqh; flex-shrink: 0; }
+.slide__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2.5cqh;
+  min-height: 0;
+}
+.cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5cqh;
+  flex: 1;
+  min-height: 0;
+}
+.stream-card {
+  padding: 3cqh 4cqw;
+  background: var(--bg-card);
+  border-left: 0.5cqh solid var(--accent-purple);
+  border-radius: 0 0.8cqh 0.8cqh 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqh;
+  flex: 1;
+  min-height: 0;
+}
+.stream-card__label {
+  font-family: var(--font-mono);
+  font-size: 1.7cqh;
+  font-weight: 500;
+  color: var(--accent-purple);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.stream-card__title {
+  font-size: 3.8cqh;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.2;
+  font-family: var(--font-heading);
+}
+.stream-card__desc {
+  font-size: 2.4cqh;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  flex: 1;
+}
+.stream-card__limit {
+  font-size: 2.1cqh;
+  color: var(--text-tertiary);
+  padding-top: 1.4cqh;
+  border-top: 1px dashed var(--border-subtle);
+  line-height: 1.5;
+}
+.stream-card__limit::before {
+  content: "한계";
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 1.6cqh;
+  font-weight: 500;
+  color: var(--accent-amber);
+  letter-spacing: 0.1em;
+  margin-right: 1cqw;
+  padding: 0.4cqh 1cqw;
+  background: #FAEEDA;
+  border-radius: 4px;
+  vertical-align: 0.2cqh;
+}
+.principle-card {
+  padding: 3cqh 4cqw;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 0.5cqh solid var(--accent-teal);
+  border-radius: 0 0.8cqh 0.8cqh 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqh;
+  flex: 1;
+  min-height: 0;
+}
+.principle-card__label {
+  font-family: var(--font-mono);
+  font-size: 1.7cqh;
+  font-weight: 500;
+  color: var(--accent-teal);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.principle-card__title {
+  font-size: 3.6cqh;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.25;
+  font-family: var(--font-heading);
+}
+.principle-card__desc {
+  font-size: 2.4cqh;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  flex: 1;
+}
+.principle-card__answers {
+  font-size: 1.9cqh;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  padding-top: 1.4cqh;
+  border-top: 1px dashed var(--border-subtle);
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+.principle-card__answers::before { content: "→ "; color: var(--accent-teal); }
+.limits-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2.2cqh;
+  flex: 1;
+  justify-content: center;
+}
+.limit-card {
+  padding: 3cqh 4cqw;
+  background: var(--bg-card);
+  border-left: 0.5cqh solid var(--accent-amber);
+  border-radius: 0 0.8cqh 0.8cqh 0;
+}
+.limit-card__title {
+  font-size: 3.2cqh;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 1cqh;
+  font-family: var(--font-heading);
+}
+.limit-card__desc {
+  font-size: 2.4cqh;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.slide-figure {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqh;
+  min-height: 0;
+}
+.slide-figure svg {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 72cqh;
+  flex: 1;
+  min-height: 0;
+}
+.slide-figure--hero svg { max-height: 80cqh; }
+.slide-figure__caption {
+  font-family: var(--font-mono);
+  font-size: 1.9cqh;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+  text-align: center;
+  flex-shrink: 0;
+}
+.slide-figure__caption strong {
+  color: var(--accent-teal);
+  font-weight: 500;
+  margin-right: 1cqw;
+  text-transform: uppercase;
+}
+text { font-family: var(--font-body); }
+text.t { font-size: 14px; fill: var(--text-primary); font-weight: 400; }
+text.ts { font-size: 12px; fill: var(--text-secondary); font-weight: 400; }
+text.th { font-size: 14px; font-weight: 500; fill: var(--text-primary); }
+.c-purple > rect, .c-purple > circle, .c-purple > ellipse { fill: #EEEDFE; stroke: #534AB7; }
+.c-purple > text { fill: #3C3489; }
+.c-purple > text.th { fill: #26215C; }
+.c-teal > rect, .c-teal > circle, .c-teal > ellipse { fill: #E1F5EE; stroke: #0F6E56; }
+.c-teal > text { fill: #085041; }
+.c-teal > text.th { fill: #04342C; }
+.c-amber > rect, .c-amber > circle, .c-amber > ellipse { fill: #FAEEDA; stroke: #BA7517; }
+.c-amber > text { fill: #633806; }
+.c-amber > text.th { fill: #412402; }
+.c-gray > rect, .c-gray > circle, .c-gray > ellipse { fill: #F1EFE8; stroke: #5F5E5A; }
+.c-gray > text { fill: #444441; }
+.c-gray > text.th { fill: #2C2C2A; }
+.arr { stroke: #5F5E5A; stroke-width: 1.5; fill: none; stroke-linecap: round; }
+.progress-bar {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  background: var(--accent-teal);
+  z-index: 100;
+  transition: width 0.3s ease;
+  width: 0;
+}
+.nav {
+  position: fixed;
+  bottom: 20px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.92);
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.3);
+  z-index: 100;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.nav button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  transition: background 0.2s, color 0.2s;
+  font-family: var(--font-mono);
+}
+.nav button:hover:not(:disabled) {
+  background: var(--border-subtle);
+  color: var(--text-primary);
+}
+.nav button:disabled { opacity: 0.25; cursor: not-allowed; }
+.nav__counter {
+  letter-spacing: 0.08em;
+  min-width: 60px;
+  text-align: center;
+  padding: 0 4px;
+  color: var(--text-secondary);
+}
+.hint {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 1;
+  transition: opacity 1.2s ease;
+  pointer-events: none;
+  z-index: 100;
+}
+.hint.fade { opacity: 0; }
+@media print {
+  html, body { overflow: visible; height: auto; background: white; }
+  .progress-bar, .nav, .hint { display: none !important; }
+  .slide {
+    position: relative !important;
+    inset: auto !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    page-break-after: always;
+    width: 100%;
+    height: 100vh;
+  }
+  .slide__content { background: white; }
+  @page { margin: 0; size: landscape; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar"></div>
+
+<section class="slide slide--title active">
+  <div class="slide__content">
+    <div class="slide__eyebrow">발표자료 · 대학원 수업 · 통합 수업 설계</div>
+    <h1 class="slide__title">AI 다문화 동료 기반<br>협력학습</h1>
+    <p class="slide__subtitle">고등학교 2학년 대상 다문화 감수성 통합 수업 설계 — 선행연구의 공백을 채우는 한 시도</p>
+    <div class="slide__meta">
+      <span>NaGeuNe</span>
+      <span>발표 시간 약 23분</span>
+      <span>2026</span>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">01 · 문제 제기</span>
+      <h2 class="slide__section-title">왜 이 수업인가</h2>
+    </div>
+    <div class="slide__main">
+      <p class="slide__lead">다문화 감수성 교육은 오랫동안 "타문화 이해"의 형태로 진행되어 왔지만, 실제 교실에서는 타자를 대상화하는 학습이 되기 쉬웠다.</p>
+      <p class="slide__body">한편 생성형 AI는 교육 현장에 빠르게 들어왔지만, 다문화 수업과의 결합은 아직 빈 영역이다. 이 발표는 그 공백을 채우는 한 가지 시도로서, AI 다문화 동료 기반 협력학습 수업을 제안한다.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">02 · 선행연구 (1/2)</span>
+      <h2 class="slide__section-title">선행연구의 네 갈래</h2>
+    </div>
+    <div class="cards-stack">
+      <div class="stream-card">
+        <div class="stream-card__label">Stream 01</div>
+        <div class="stream-card__title">한국어교육 KCI</div>
+        <div class="stream-card__desc">유지연·심규진(2024) 등이 외국인·다문화 배경 학습자가 AI를 어떻게 사용하는지 조사. AI = 도구, 학습자 = 수혜자라는 비대칭 구도.</div>
+        <div class="stream-card__limit">내국인 학생이 다문화 감수성을 기르는 학습 장면에서 AI를 어떻게 활용할 것인가에 대한 설계 연구는 거의 비어 있음.</div>
+      </div>
+      <div class="stream-card">
+        <div class="stream-card__label">Stream 02</div>
+        <div class="stream-card__title">문화적 반응 교수법 × AI</div>
+        <div class="stream-card__desc">Bridging Cultural Distance(2025), Hwang et al.(2022) 등이 교사가 AI를 자신의 다문화 학급에 문화적으로 적합하게 적응시키는 양상에 초점.</div>
+        <div class="stream-card__limit">분석 단위가 교사이고, 학생이 AI와 만나면서 다문화 감수성을 형성하는 학습 활동 자체의 설계는 다루지 않음.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">02 · 선행연구 (2/2)</span>
+      <h2 class="slide__section-title">선행연구의 네 갈래</h2>
+    </div>
+    <div class="cards-stack">
+      <div class="stream-card">
+        <div class="stream-card__label">Stream 03</div>
+        <div class="stream-card__title">비판 이론</div>
+        <div class="stream-card__desc">Nyaaba et al.(2024), Godwin-Jones(2024) 등이 LLM의 서구 중심 데이터 편향과 비서구 문화 주변화를 강하게 비판.</div>
+        <div class="stream-card__limit">이론적 비판은 강력하지만 수업 설계로 번역되지 않음. 학생이 AI 편향을 어떻게 체험하고 응답할 것인가의 처방 부재.</div>
+      </div>
+      <div class="stream-card">
+        <div class="stream-card__label">Stream 04</div>
+        <div class="stream-card__title">국내 실천 사례</div>
+        <div class="stream-card__desc">삼일미래재단 다문화 학생 AI 동화책(2025), 클래스팅 AI 안산 다문화 학급 등 다문화 학생 학습 접근성을 AI로 보조하는 사례.</div>
+        <div class="stream-card__limit">AI는 격차 해소 도구로 위치하고, 다문화 이해 자체를 학습 내용으로 다루지는 않음.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">02 · 선행연구</span>
+      <h2 class="slide__section-title">공통 공백과 본 설계의 응답</h2>
+    </div>
+    <div class="slide-figure slide-figure--hero">
+      <svg viewBox="0 0 680 470" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>선행연구 네 갈래의 공통 공백과 본 설계의 응답</title>
+        <desc>네 갈래의 선행연구가 공통적으로 비워두는 자리와, 본 설계가 그 자리에 응답하는 구조를 보여주는 다이어그램.</desc>
+        <defs>
+          <marker id="arrow1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <g class="c-purple">
+          <rect x="50" y="40" width="280" height="80" rx="8" stroke-width="0.5"/>
+          <text class="th" x="190" y="68" text-anchor="middle" dominant-baseline="central">한국어교육 KCI</text>
+          <text class="ts" x="190" y="94" text-anchor="middle" dominant-baseline="central">학습자 = AI 사용 수혜자</text>
+        </g>
+        <g class="c-purple">
+          <rect x="350" y="40" width="280" height="80" rx="8" stroke-width="0.5"/>
+          <text class="th" x="490" y="68" text-anchor="middle" dominant-baseline="central">문화적 반응 교수법 × AI</text>
+          <text class="ts" x="490" y="94" text-anchor="middle" dominant-baseline="central">교사의 적응 자원</text>
+        </g>
+        <g class="c-purple">
+          <rect x="50" y="135" width="280" height="80" rx="8" stroke-width="0.5"/>
+          <text class="th" x="190" y="163" text-anchor="middle" dominant-baseline="central">비판 이론</text>
+          <text class="ts" x="190" y="189" text-anchor="middle" dominant-baseline="central">AI = 비판 대상 (수업화 ✗)</text>
+        </g>
+        <g class="c-purple">
+          <rect x="350" y="135" width="280" height="80" rx="8" stroke-width="0.5"/>
+          <text class="th" x="490" y="163" text-anchor="middle" dominant-baseline="central">국내 실천 사례</text>
+          <text class="ts" x="490" y="189" text-anchor="middle" dominant-baseline="central">격차 해소 도구</text>
+        </g>
+        <line x1="340" y1="215" x2="340" y2="248" class="arr" marker-end="url(#arrow1)"/>
+        <g class="c-amber">
+          <rect x="80" y="258" width="520" height="80" rx="8" stroke-width="0.5"/>
+          <text class="th" x="340" y="286" text-anchor="middle" dominant-baseline="central">공통 공백</text>
+          <text class="ts" x="340" y="312" text-anchor="middle" dominant-baseline="central">AI를 다문화 감수성 학습의 '대화 상대'로 자리매김하는 설계 부재</text>
+        </g>
+        <line x1="340" y1="338" x2="340" y2="371" class="arr" marker-end="url(#arrow1)"/>
+        <g class="c-teal">
+          <rect x="80" y="381" width="520" height="70" rx="8" stroke-width="0.5"/>
+          <text class="th" x="340" y="406" text-anchor="middle" dominant-baseline="central">본 설계의 응답</text>
+          <text class="ts" x="340" y="430" text-anchor="middle" dominant-baseline="central">AI 다문화 동료 기반 협력학습 — 가상 인물 페르소나 + 모둠 동료</text>
+        </g>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 1</strong>네 갈래의 공통 공백, 그리고 본 설계가 응답하는 자리</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">03 · 본 설계</span>
+      <h2 class="slide__section-title">AI 다문화 동료 기반 협력학습</h2>
+    </div>
+    <div class="slide-figure">
+      <svg viewBox="0 0 680 320" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>AI의 자리: 도구로서의 AI와 동료로서의 AI</title>
+        <desc>왼쪽 패널은 학습자가 AI를 일방적으로 사용하는 도구로서의 AI 구도, 오른쪽 패널은 학생들과 AI가 모둠에서 서로 묻고 답하는 동료로서의 AI 구도를 대비한다.</desc>
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <text class="th" x="180" y="38" text-anchor="middle" dominant-baseline="central">기존: AI = 도구</text>
+        <g class="c-purple">
+          <circle cx="80" cy="160" r="22" stroke-width="0.5"/>
+          <text class="th" x="80" y="160" text-anchor="middle" dominant-baseline="central">학생</text>
+        </g>
+        <g class="c-amber">
+          <rect x="158" y="138" width="60" height="44" rx="8" stroke-width="0.5"/>
+          <text class="th" x="188" y="160" text-anchor="middle" dominant-baseline="central">AI</text>
+        </g>
+        <g class="c-purple">
+          <circle cx="270" cy="120" r="18" stroke-width="0.5" opacity="0.4"/>
+          <text class="ts" x="270" y="120" text-anchor="middle" dominant-baseline="central" opacity="0.55">학</text>
+        </g>
+        <g class="c-purple">
+          <circle cx="270" cy="200" r="18" stroke-width="0.5" opacity="0.4"/>
+          <text class="ts" x="270" y="200" text-anchor="middle" dominant-baseline="central" opacity="0.55">학</text>
+        </g>
+        <line x1="103" y1="150" x2="156" y2="150" stroke="#534AB7" stroke-width="1.2" marker-end="url(#arrow2)" fill="none"/>
+        <line x1="156" y1="170" x2="103" y2="170" stroke="#534AB7" stroke-width="1.2" marker-end="url(#arrow2)" fill="none"/>
+        <text class="ts" x="180" y="232" text-anchor="middle">학습자가 AI를 일방적으로 활용</text>
+        <text class="ts" x="180" y="252" text-anchor="middle">AI는 모둠 활동 외부에 위치</text>
+        <text class="ts" x="180" y="272" text-anchor="middle">다른 학생과 분리된 1:1 구도</text>
+        <line x1="340" y1="30" x2="340" y2="290" stroke="#D3D1C7" stroke-width="0.5" stroke-dasharray="4 4"/>
+        <text class="th" x="500" y="38" text-anchor="middle" dominant-baseline="central">본 설계: AI = 동료</text>
+        <g class="c-purple">
+          <circle cx="430" cy="130" r="22" stroke-width="0.5"/>
+          <text class="th" x="430" y="130" text-anchor="middle" dominant-baseline="central">학생</text>
+        </g>
+        <g class="c-purple">
+          <circle cx="570" cy="130" r="22" stroke-width="0.5"/>
+          <text class="th" x="570" y="130" text-anchor="middle" dominant-baseline="central">학생</text>
+        </g>
+        <g class="c-purple">
+          <circle cx="430" cy="200" r="22" stroke-width="0.5"/>
+          <text class="th" x="430" y="200" text-anchor="middle" dominant-baseline="central">학생</text>
+        </g>
+        <g class="c-amber">
+          <rect x="548" y="178" width="44" height="44" rx="22" stroke-width="0.5"/>
+          <text class="th" x="570" y="200" text-anchor="middle" dominant-baseline="central">AI</text>
+        </g>
+        <line x1="452" y1="130" x2="548" y2="130" stroke="#0F6E56" stroke-width="1.5"/>
+        <line x1="430" y1="152" x2="430" y2="178" stroke="#0F6E56" stroke-width="1.5"/>
+        <line x1="570" y1="152" x2="570" y2="178" stroke="#0F6E56" stroke-width="1.5"/>
+        <line x1="452" y1="200" x2="548" y2="200" stroke="#0F6E56" stroke-width="1.5"/>
+        <line x1="450" y1="148" x2="552" y2="180" stroke="#0F6E56" stroke-width="1" opacity="0.5"/>
+        <line x1="450" y1="184" x2="552" y2="148" stroke="#0F6E56" stroke-width="1" opacity="0.5"/>
+        <text class="ts" x="500" y="252" text-anchor="middle">AI도 모둠에 기여하는 가상의 학생</text>
+        <text class="ts" x="500" y="272" text-anchor="middle">학생-학생, 학생-AI 모두 상호 관계</text>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 2</strong>AI의 자리 — 도구로서의 AI와 동료로서의 AI</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">03 · 본 설계 (1/2)</span>
+      <h2 class="slide__section-title">설계 원칙 — 네 가지 응답</h2>
+    </div>
+    <div class="cards-stack">
+      <div class="principle-card">
+        <div class="principle-card__label">Principle 01</div>
+        <div class="principle-card__title">AI는 실제 국가·민족·종교를 대표하지 않는 가상 인물</div>
+        <div class="principle-card__desc">"베트남에서 온 AI"를 만들지 않음으로써 AI가 특정 집단을 대표한다는 환상 자체를 차단.</div>
+        <div class="principle-card__answers">Nyaaba(2024)·Godwin-Jones(2024)의 문화 일반화 비판에 응답</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-card__label">Principle 02</div>
+        <div class="principle-card__title">AI도 모둠에 기여하는 동료다</div>
+        <div class="principle-card__desc">학생이 일방적으로 AI를 활용하는 것이 아니라, AI도 의견을 내고 학생도 AI에게 묻는 상호 기여 구조.</div>
+        <div class="principle-card__answers">"AI = 도구" 비대칭 구도(Stream 01·04)에 응답</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">03 · 본 설계 (2/2)</span>
+      <h2 class="slide__section-title">설계 원칙 — 네 가지 응답</h2>
+    </div>
+    <div class="cards-stack">
+      <div class="principle-card">
+        <div class="principle-card__label">Principle 03</div>
+        <div class="principle-card__title">편견 표현 시 AI가 부드러운 질문으로 되돌려준다</div>
+        <div class="principle-card__desc">"AI에 편향이 있다"고 말하는 대신, 학생 자신의 편향을 자기가 마주치도록 설계.</div>
+        <div class="principle-card__answers">비판 이론(Stream 03)을 수업 활동 안에 체화</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-card__label">Principle 04</div>
+        <div class="principle-card__title">모둠 협력 + 개인 성찰의 이중 구조</div>
+        <div class="principle-card__desc">학습자-AI 1:1 구도에서 벗어나, 모둠 협력으로 다문화 감수성 형성을 도모하고 개인 성찰로 마무리.</div>
+        <div class="principle-card__answers">Stream 01의 1:1 학습자-AI 구도에 응답</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">03 · 본 설계</span>
+      <h2 class="slide__section-title">선행연구 한계 ↔ 본 설계 원칙</h2>
+    </div>
+    <div class="slide-figure slide-figure--hero">
+      <svg viewBox="0 0 680 410" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>선행연구 한계와 본 설계 원칙의 대응 매핑</title>
+        <desc>네 가지 선행연구 한계와 본 설계의 네 가지 원칙이 1:1로 대응됨을 보여주는 매핑 다이어그램.</desc>
+        <defs>
+          <marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <text class="th" x="170" y="40" text-anchor="middle" dominant-baseline="central">선행연구 한계</text>
+        <text class="th" x="510" y="40" text-anchor="middle" dominant-baseline="central">본 설계의 원칙</text>
+        <g class="c-amber">
+          <rect x="40" y="60" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="170" y="82" text-anchor="middle" dominant-baseline="central">문화 일반화 비판</text>
+          <text class="ts" x="170" y="104" text-anchor="middle" dominant-baseline="central">Nyaaba(2024)·Godwin-Jones(2024)</text>
+        </g>
+        <line x1="305" y1="92" x2="375" y2="92" class="arr" marker-end="url(#arrow3)"/>
+        <g class="c-teal">
+          <rect x="380" y="60" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="510" y="82" text-anchor="middle" dominant-baseline="central">가상 인물 페르소나</text>
+          <text class="ts" x="510" y="104" text-anchor="middle" dominant-baseline="central">특정 국가·민족 대표 안 함</text>
+        </g>
+        <g class="c-amber">
+          <rect x="40" y="144" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="170" y="166" text-anchor="middle" dominant-baseline="central">AI = 도구 비대칭</text>
+          <text class="ts" x="170" y="188" text-anchor="middle" dominant-baseline="central">한국어교육 / 국내 실천 사례</text>
+        </g>
+        <line x1="305" y1="176" x2="375" y2="176" class="arr" marker-end="url(#arrow3)"/>
+        <g class="c-teal">
+          <rect x="380" y="144" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="510" y="166" text-anchor="middle" dominant-baseline="central">AI도 모둠 동료</text>
+          <text class="ts" x="510" y="188" text-anchor="middle" dominant-baseline="central">상호 기여 구조</text>
+        </g>
+        <g class="c-amber">
+          <rect x="40" y="228" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="170" y="250" text-anchor="middle" dominant-baseline="central">비판 이론의 수업화 부재</text>
+          <text class="ts" x="170" y="272" text-anchor="middle" dominant-baseline="central">이론은 있으나 처방이 없음</text>
+        </g>
+        <line x1="305" y1="260" x2="375" y2="260" class="arr" marker-end="url(#arrow3)"/>
+        <g class="c-teal">
+          <rect x="380" y="228" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="510" y="250" text-anchor="middle" dominant-baseline="central">편견 표현 시 되묻기</text>
+          <text class="ts" x="510" y="272" text-anchor="middle" dominant-baseline="central">학생이 자기 편향과 마주침</text>
+        </g>
+        <g class="c-amber">
+          <rect x="40" y="312" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="170" y="334" text-anchor="middle" dominant-baseline="central">1:1 학습자-AI 구도</text>
+          <text class="ts" x="170" y="356" text-anchor="middle" dominant-baseline="central">개별 학습 중심</text>
+        </g>
+        <line x1="305" y1="344" x2="375" y2="344" class="arr" marker-end="url(#arrow3)"/>
+        <g class="c-teal">
+          <rect x="380" y="312" width="260" height="64" rx="8" stroke-width="0.5"/>
+          <text class="t" x="510" y="334" text-anchor="middle" dominant-baseline="central">모둠 협력 + 개인 성찰</text>
+          <text class="ts" x="510" y="356" text-anchor="middle" dominant-baseline="central">이중 구조 설계</text>
+        </g>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 3</strong>선행연구 한계와 본 설계 원칙의 1:1 대응</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 04 · 시연 (구현 시연) ───────── -->
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">04 · 시연 (1/3)</span>
+      <h2 class="slide__section-title">학생 입장 흐름</h2>
+    </div>
+    <div class="slide-figure slide-figure--hero">
+      <svg viewBox="0 0 680 380" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>학생 입장 3단계</title>
+        <desc>학생이 수업 코드를 입력하고, 자기 이름을 입력하고, 교사 배정을 기다린 후 활동방으로 진입하는 흐름.</desc>
+        <defs>
+          <marker id="arrowDemoA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <g class="c-purple">
+          <rect x="30" y="60" width="180" height="240" rx="12" stroke-width="1"/>
+          <text class="th" x="120" y="92" text-anchor="middle" dominant-baseline="central">1. 코드 입력</text>
+          <rect x="55" y="125" width="130" height="34" rx="4" fill="#FFFFFF" stroke="#D5D2E8" stroke-width="0.8"/>
+          <text class="ts" x="120" y="143" text-anchor="middle" dominant-baseline="central" fill="#888780">lesson_xxxxxxxx</text>
+          <rect x="55" y="180" width="130" height="36" rx="4" fill="#1F1F1E"/>
+          <text class="ts" x="120" y="199" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">다음</text>
+          <text class="ts" x="120" y="260" text-anchor="middle" dominant-baseline="central">교사가 안내한 코드</text>
+        </g>
+        <line x1="218" y1="180" x2="244" y2="180" class="arr" marker-end="url(#arrowDemoA)"/>
+        <g class="c-purple">
+          <rect x="250" y="60" width="180" height="240" rx="12" stroke-width="1"/>
+          <text class="th" x="340" y="92" text-anchor="middle" dominant-baseline="central">2. 이름 입력</text>
+          <rect x="275" y="125" width="130" height="34" rx="4" fill="#FFFFFF" stroke="#D5D2E8" stroke-width="0.8"/>
+          <text class="ts" x="340" y="143" text-anchor="middle" dominant-baseline="central" fill="#888780">홍길동</text>
+          <rect x="275" y="180" width="130" height="36" rx="4" fill="#1F1F1E"/>
+          <text class="ts" x="340" y="199" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF">입장</text>
+          <text class="ts" x="340" y="260" text-anchor="middle" dominant-baseline="central">모둠은 교사가 정한다</text>
+        </g>
+        <line x1="438" y1="180" x2="464" y2="180" class="arr" marker-end="url(#arrowDemoA)"/>
+        <g class="c-teal">
+          <rect x="470" y="60" width="180" height="240" rx="12" stroke-width="1"/>
+          <text class="th" x="560" y="92" text-anchor="middle" dominant-baseline="central">3. 대기 → 활동방</text>
+          <circle cx="560" cy="160" r="22"/>
+          <circle cx="560" cy="160" r="9" fill="#0F6E56" stroke="none"/>
+          <text class="ts" x="560" y="210" text-anchor="middle" dominant-baseline="central">교사가 모둠 배정</text>
+          <text class="ts" x="560" y="232" text-anchor="middle" dominant-baseline="central">→ 즉시 자동 전환</text>
+          <text class="ts" x="560" y="260" text-anchor="middle" dominant-baseline="central">Realtime 동기화</text>
+        </g>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 5</strong>학생 입장의 3단계 — 모둠 선택권은 학생이 아닌 교사에게 있다</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">04 · 시연 (2/3)</span>
+      <h2 class="slide__section-title">활동방 — 좌(공유) · 우(개인)</h2>
+    </div>
+    <div class="slide-figure slide-figure--hero">
+      <svg viewBox="0 0 680 400" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>활동방 16:9 레이아웃</title>
+        <desc>활동방은 좌측 공유 패널(개요·채팅·역할 분담)과 우측 개인 패널(활동 기록·성찰문)로 분할된다.</desc>
+        <rect x="20" y="20" width="640" height="34" rx="6" fill="#FFFFFF" stroke="#E8E5DD" stroke-width="0.8"/>
+        <text class="ts" x="34" y="38" dominant-baseline="central" fill="#534AB7">1모둠 활동방</text>
+        <text class="ts" x="640" y="38" dominant-baseline="central" text-anchor="end">나: 홍길동 · 모둠원 4/4</text>
+        <g class="c-purple">
+          <rect x="20" y="66" width="370" height="318" rx="8" stroke-width="0.8"/>
+          <rect x="20" y="66" width="123" height="32" rx="0" fill="#FFFFFF" stroke="none"/>
+          <line x1="20" y1="98" x2="143" y2="98" stroke="#534AB7" stroke-width="2"/>
+          <text class="th" x="82" y="84" text-anchor="middle" dominant-baseline="central" fill="#534AB7">개요</text>
+          <text class="ts" x="205" y="84" text-anchor="middle" dominant-baseline="central">채팅</text>
+          <text class="ts" x="328" y="84" text-anchor="middle" dominant-baseline="central">역할 분담</text>
+          <line x1="20" y1="98" x2="390" y2="98" stroke="#E8E5DD" stroke-width="0.5"/>
+          <rect x="40" y="120" width="240" height="44" rx="8" fill="#FFFFFF" stroke="#E8E5DD" stroke-width="0.5"/>
+          <text class="ts" x="50" y="135" dominant-baseline="central" fill="#888780">민하 (AI)</text>
+          <text class="ts" x="50" y="153" dominant-baseline="central">○○야, 그 줄임말 무슨 뜻이야?</text>
+          <rect x="130" y="180" width="240" height="44" rx="8" fill="#1F1F1E" stroke="none"/>
+          <text class="ts" x="358" y="195" text-anchor="end" dominant-baseline="central" fill="#A8A6A0">우리 모둠</text>
+          <text class="ts" x="358" y="213" text-anchor="end" dominant-baseline="central" fill="#FFFFFF">"발표문" 풀어 설명할게</text>
+          <rect x="40" y="240" width="240" height="44" rx="8" fill="#FFFFFF" stroke="#E8E5DD" stroke-width="0.5"/>
+          <text class="ts" x="50" y="255" dominant-baseline="central" fill="#888780">민하 (AI)</text>
+          <text class="ts" x="50" y="273" dominant-baseline="central">고마워! 발표 부분 같이 정해보자</text>
+          <text class="ts" x="205" y="350" text-anchor="middle" dominant-baseline="central" fill="#534AB7">모둠 공유 · 실시간</text>
+        </g>
+        <g class="c-teal">
+          <rect x="400" y="66" width="260" height="318" rx="8" stroke-width="0.8"/>
+          <rect x="400" y="66" width="130" height="32" rx="0" fill="#FFFFFF" stroke="none"/>
+          <line x1="400" y1="98" x2="530" y2="98" stroke="#0F6E56" stroke-width="2"/>
+          <text class="th" x="465" y="84" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">활동 기록</text>
+          <text class="ts" x="595" y="84" text-anchor="middle" dominant-baseline="central">성찰문</text>
+          <line x1="400" y1="98" x2="660" y2="98" stroke="#E8E5DD" stroke-width="0.5"/>
+          <text class="ts" x="415" y="120" dominant-baseline="central">AI 동료가 필요로 한 도움</text>
+          <rect x="415" y="130" width="230" height="46" rx="4" fill="#FFFFFF" stroke="#E8E5DD" stroke-width="0.5"/>
+          <text class="ts" x="415" y="194" dominant-baseline="central">AI 동료가 기여할 수 있는 강점</text>
+          <rect x="415" y="204" width="230" height="46" rx="4" fill="#FFFFFF" stroke="#E8E5DD" stroke-width="0.5"/>
+          <text class="ts" x="415" y="268" dominant-baseline="central">우리 모둠의 해결안</text>
+          <rect x="415" y="278" width="230" height="46" rx="4" fill="#FFFFFF" stroke="#E8E5DD" stroke-width="0.5"/>
+          <text class="ts" x="530" y="350" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">개인 입력 · 본인만 보임</text>
+        </g>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 6</strong>좌(모둠 공유)와 우(개인 입력) 분리 — 협력과 성찰을 동시에 담는다</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">04 · 시연 (3/3)</span>
+      <h2 class="slide__section-title">교사 — 모둠 구성과 페르소나 다중화</h2>
+    </div>
+    <div class="slide-figure slide-figure--hero">
+      <svg viewBox="0 0 680 410" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>교사 대시보드</title>
+        <desc>교사 화면: 입장 학생 풀과 4개 모둠 카드. 각 모둠은 서로 다른 AI 페르소나를 가진다.</desc>
+        <g class="c-purple">
+          <rect x="20" y="14" width="640" height="38" rx="8" stroke-width="0.5"/>
+          <text class="th" x="34" y="34" dominant-baseline="central">1차 시연 수업</text>
+          <text class="ts" x="225" y="34" dominant-baseline="central" font-family="IBM Plex Mono">코드 · lesson_xxx</text>
+          <text class="ts" x="638" y="34" dominant-baseline="central" text-anchor="end">[ 학생 링크 복사 ]  [ 새 코드 ]</text>
+        </g>
+        <g class="c-amber">
+          <rect x="20" y="64" width="640" height="80" rx="8" stroke-width="0.6" stroke-dasharray="4 3" fill-opacity="0.45"/>
+          <text class="th" x="34" y="86" dominant-baseline="central">전체 입장 학생 (5명) · 미배정 1명</text>
+          <rect x="34" y="102" width="116" height="28" rx="14" fill="#FFFFFF" stroke="#E8E5DD"/>
+          <text class="ts" x="92" y="118" text-anchor="middle" dominant-baseline="central">홍길동 · 1모둠</text>
+          <rect x="158" y="102" width="116" height="28" rx="14" fill="#FFFFFF" stroke="#E8E5DD"/>
+          <text class="ts" x="216" y="118" text-anchor="middle" dominant-baseline="central">김민지 · 2모둠</text>
+          <rect x="282" y="102" width="116" height="28" rx="14" fill="#FFFFFF" stroke="#E8E5DD"/>
+          <text class="ts" x="340" y="118" text-anchor="middle" dominant-baseline="central">이서연 · 3모둠</text>
+          <rect x="406" y="102" width="116" height="28" rx="14" fill="#FFFFFF" stroke="#E8E5DD"/>
+          <text class="ts" x="464" y="118" text-anchor="middle" dominant-baseline="central">박지호 · 4모둠</text>
+          <rect x="530" y="102" width="116" height="28" rx="14" fill="#FAEEDA" stroke="#BA7517"/>
+          <text class="ts" x="588" y="118" text-anchor="middle" dominant-baseline="central" fill="#854F0B">박서준 · 미배정</text>
+        </g>
+        <g class="c-teal">
+          <rect x="20" y="160" width="310" height="110" rx="8" stroke-width="0.5"/>
+          <text class="th" x="34" y="184" dominant-baseline="central">1모둠</text>
+          <text class="ts" x="320" y="184" text-anchor="end" dominant-baseline="central">1 / 4</text>
+          <text class="ts" x="34" y="212" dominant-baseline="central">AI 동료 · 민하 — 언어 적응형</text>
+          <text class="ts" x="34" y="244" dominant-baseline="central" fill="#888780">홍길동</text>
+        </g>
+        <g class="c-teal">
+          <rect x="350" y="160" width="310" height="110" rx="8" stroke-width="0.5"/>
+          <text class="th" x="364" y="184" dominant-baseline="central">2모둠</text>
+          <text class="ts" x="650" y="184" text-anchor="end" dominant-baseline="central">1 / 4</text>
+          <text class="ts" x="364" y="212" dominant-baseline="central">AI 동료 · 지우 — 문화 오해형</text>
+          <text class="ts" x="364" y="244" dominant-baseline="central" fill="#888780">김민지</text>
+        </g>
+        <g class="c-teal">
+          <rect x="20" y="282" width="310" height="110" rx="8" stroke-width="0.5"/>
+          <text class="th" x="34" y="306" dominant-baseline="central">3모둠</text>
+          <text class="ts" x="320" y="306" text-anchor="end" dominant-baseline="central">1 / 4</text>
+          <text class="ts" x="34" y="334" dominant-baseline="central">AI 동료 · 선재 — 소속감 고민형</text>
+          <text class="ts" x="34" y="366" dominant-baseline="central" fill="#888780">이서연</text>
+        </g>
+        <g class="c-teal">
+          <rect x="350" y="282" width="310" height="110" rx="8" stroke-width="0.5"/>
+          <text class="th" x="364" y="306" dominant-baseline="central">4모둠</text>
+          <text class="ts" x="650" y="306" text-anchor="end" dominant-baseline="central">1 / 4</text>
+          <text class="ts" x="364" y="334" dominant-baseline="central">AI 동료 · 하늘 — 언어 적응형</text>
+          <text class="ts" x="364" y="366" dominant-baseline="central" fill="#888780">박지호</text>
+        </g>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 7</strong>모둠마다 다른 AI 페르소나 — 한 학급 안에서 다층적 다문화 경험</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">05 · 위치 짓기</span>
+      <h2 class="slide__section-title">본 설계의 학술적 자리</h2>
+    </div>
+    <div class="slide-figure">
+      <svg viewBox="0 0 680 380" role="img" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <title>위치 짓기 비교표</title>
+        <desc>다섯 접근법을 학습자-AI 관계와 다문화의 자리 두 축으로 비교한 표.</desc>
+        <g class="c-gray">
+          <rect x="40" y="30" width="600" height="44" rx="8" stroke-width="0.5"/>
+          <text class="th" x="130" y="52" text-anchor="middle" dominant-baseline="central">선행연구 갈래</text>
+          <text class="th" x="320" y="52" text-anchor="middle" dominant-baseline="central">학습자-AI 관계</text>
+          <text class="th" x="530" y="52" text-anchor="middle" dominant-baseline="central">다문화의 자리</text>
+        </g>
+        <line x1="40" y1="84" x2="640" y2="84" stroke="#E8E5DD" stroke-width="0.5"/>
+        <text class="t" x="130" y="109" text-anchor="middle" dominant-baseline="central">한국어교육 KCI</text>
+        <text class="ts" x="320" y="109" text-anchor="middle" dominant-baseline="central">학습자 ← AI (도구)</text>
+        <text class="ts" x="530" y="109" text-anchor="middle" dominant-baseline="central">학습자의 배경</text>
+        <line x1="40" y1="134" x2="640" y2="134" stroke="#E8E5DD" stroke-width="0.5"/>
+        <text class="t" x="130" y="159" text-anchor="middle" dominant-baseline="central">문화적 반응 교수법</text>
+        <text class="ts" x="320" y="159" text-anchor="middle" dominant-baseline="central">교사 ← AI (자원)</text>
+        <text class="ts" x="530" y="159" text-anchor="middle" dominant-baseline="central">교수 적응의 대상</text>
+        <line x1="40" y1="184" x2="640" y2="184" stroke="#E8E5DD" stroke-width="0.5"/>
+        <text class="t" x="130" y="209" text-anchor="middle" dominant-baseline="central">비판 이론</text>
+        <text class="ts" x="320" y="209" text-anchor="middle" dominant-baseline="central">비판 대상으로서의 AI</text>
+        <text class="ts" x="530" y="209" text-anchor="middle" dominant-baseline="central">이론적 분석 대상</text>
+        <line x1="40" y1="234" x2="640" y2="234" stroke="#E8E5DD" stroke-width="0.5"/>
+        <text class="t" x="130" y="259" text-anchor="middle" dominant-baseline="central">국내 실천 사례</text>
+        <text class="ts" x="320" y="259" text-anchor="middle" dominant-baseline="central">학습자 ← AI (접근성)</text>
+        <text class="ts" x="530" y="259" text-anchor="middle" dominant-baseline="central">격차 해소 대상</text>
+        <g class="c-teal">
+          <rect x="40" y="290" width="600" height="56" rx="8" stroke-width="0.5"/>
+          <text class="th" x="130" y="318" text-anchor="middle" dominant-baseline="central">본 설계</text>
+          <text class="th" x="320" y="318" text-anchor="middle" dominant-baseline="central">학습자 ↔ AI (동료)</text>
+          <text class="th" x="530" y="318" text-anchor="middle" dominant-baseline="central">학습 활동의 핵심 주제</text>
+        </g>
+      </svg>
+      <div class="slide-figure__caption"><strong>그림 4</strong>다섯 접근의 위치 짓기 비교</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="slide__content">
+    <div class="slide__header">
+      <span class="slide__section-num">06 · 마무리</span>
+      <h2 class="slide__section-title">한계와 후속 과제</h2>
+    </div>
+    <div class="limits-stack">
+      <div class="limit-card">
+        <div class="limit-card__title">가상 페르소나의 위험</div>
+        <div class="limit-card__desc">가상 페르소나 설계가 또 다른 형태의 문화 본질주의로 흐를 위험. 대응으로 페르소나 설계 시 "특정 문화권 ×"를 명시함.</div>
+      </div>
+      <div class="limit-card">
+        <div class="limit-card__title">평가 도구의 부재</div>
+        <div class="limit-card__desc">학생의 다문화 감수성 변화를 측정하는 평가 도구가 부재함. 후속 연구에서 평가 도구 개발이 필요함.</div>
+      </div>
+      <div class="limit-card">
+        <div class="limit-card__title">AI 응답의 안전성 검증</div>
+        <div class="limit-card__desc">AI 응답의 일관성·안전성에 대한 체계적 검증이 필요하며, 실제 수업 적용 후 데이터로 보완할 예정.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<nav class="nav" aria-label="슬라이드 네비게이션">
+  <button class="nav__prev" aria-label="이전 슬라이드">←</button>
+  <span class="nav__counter">1 / 11</span>
+  <button class="nav__next" aria-label="다음 슬라이드">→</button>
+</nav>
+
+<div class="hint">← → / Space 로 이동 · F 전체화면</div>
+
+<script>
+(function() {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  let current = 0;
+
+  const counter = document.querySelector('.nav__counter');
+  const prevBtn = document.querySelector('.nav__prev');
+  const nextBtn = document.querySelector('.nav__next');
+  const progress = document.querySelector('.progress-bar');
+  const hint = document.querySelector('.hint');
+
+  function go(i) {
+    current = Math.max(0, Math.min(total - 1, i));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === current));
+    counter.textContent = (current + 1) + ' / ' + total;
+    progress.style.width = (((current + 1) / total) * 100) + '%';
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+    history.replaceState(null, '', '#s' + (current + 1));
+  }
+
+  prevBtn.addEventListener('click', () => go(current - 1));
+  nextBtn.addEventListener('click', () => go(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault();
+      go(current + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      go(current - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      go(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      go(total - 1);
+    } else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+  });
+
+  const hash = window.location.hash.match(/^#s(\d+)$/);
+  if (hash) {
+    const i = parseInt(hash[1], 10) - 1;
+    if (i >= 0 && i < total) current = i;
+  }
+
+  setTimeout(() => hint.classList.add('fade'), 4500);
+  go(current);
+})();
+</script>
+
+</body>
+</html>
