@@ -33,6 +33,33 @@ type Member = {
   joined_at: string;
 };
 
+type ActivityRecord = {
+  group_id: string;
+  student_name: string;
+  ai_needs: string;
+  ai_strengths: string;
+  group_solution: string;
+  ai_feedback: string;
+  final_revision: string;
+  updated_at: string;
+};
+
+type Reflection = {
+  group_id: string;
+  student_name: string;
+  answers: string[];
+  updated_at: string;
+};
+
+const reflectionQuestions = [
+  "처음에 나는 AI 다문화 동료에게 어떤 도움이 필요할 것이라고 예상했나요?",
+  "실제 대화를 해보니 내 예상과 달랐던 점은 무엇이었나요?",
+  "내가 맡은 역할은 AI 동료의 참여에 어떤 도움을 주었나요?",
+  "혹시 상대의 필요를 묻지 않고 미리 판단한 부분은 없었나요?",
+  "‘도움’은 일방적으로 베푸는 것이 아니라 함께 참여할 조건을 만드는 일이라는 말의 의미는 무엇인가요?",
+  "실제 학급 친구와 협력할 때 내가 실천할 수 있는 태도는 무엇인가요?",
+];
+
 type Role = {
   group_id: string;
   student_name: string;
@@ -43,6 +70,7 @@ type GroupView = Group & {
   members: Member[];
   roles: Role[];
   reflectionCount: number;
+  activityCount: number;
 };
 
 async function api(action: string, payload: Record<string, unknown> = {}) {
@@ -61,6 +89,9 @@ export default function TeacherPage() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [groups, setGroups] = useState<GroupView[]>([]);
   const [unassigned, setUnassigned] = useState<Member[]>([]);
+  const [activityRecords, setActivityRecords] = useState<ActivityRecord[]>([]);
+  const [reflections, setReflections] = useState<Reflection[]>([]);
+  const [viewingStudent, setViewingStudent] = useState<Member | null>(null);
 
   const [title, setTitle] = useState("AI 다문화 동료와 함께하는 모둠활동");
   const [topic, setTopic] = useState("모두가 참여할 수 있는 학교 축제 만들기");
@@ -91,6 +122,8 @@ export default function TeacherPage() {
       setSelectedLesson(data.lesson);
       setGroups(data.groups);
       setUnassigned(data.unassigned || []);
+      setActivityRecords(data.activityRecords || []);
+      setReflections(data.reflections || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류");
     }
@@ -271,6 +304,11 @@ export default function TeacherPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reflections" },
+        refetch
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "activity_records" },
         refetch
       )
       .subscribe();
@@ -500,9 +538,13 @@ export default function TeacherPage() {
                                   key={m.id}
                                   className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 shadow-sm"
                                 >
-                                  <span className="text-sm font-semibold text-slate-900">
+                                  <button
+                                    onClick={() => setViewingStudent(m)}
+                                    title="제출물 보기"
+                                    className="text-sm font-semibold text-slate-900 hover:text-indigo-600 hover:underline"
+                                  >
                                     {m.student_name}
-                                  </span>
+                                  </button>
                                   <span
                                     className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
                                       currentGroup
@@ -565,6 +607,7 @@ export default function TeacherPage() {
                           onUpdate={(patch) => updateGroup(g.id, patch)}
                           onDelete={() => deleteGroup(g.id)}
                           onUnassign={unassignMember}
+                          onViewStudent={(m) => setViewingStudent(m)}
                         />
                       ))}
                     </div>
@@ -575,6 +618,33 @@ export default function TeacherPage() {
           </section>
         </div>
       </div>
+
+      {/* 학생 제출물 모달 */}
+      {viewingStudent && (
+        <StudentSubmissionsModal
+          member={viewingStudent}
+          group={
+            viewingStudent.group_id
+              ? groups.find((g) => g.id === viewingStudent.group_id) || null
+              : null
+          }
+          activity={
+            activityRecords.find(
+              (r) =>
+                r.group_id === viewingStudent.group_id &&
+                r.student_name === viewingStudent.student_name
+            ) || null
+          }
+          reflection={
+            reflections.find(
+              (r) =>
+                r.group_id === viewingStudent.group_id &&
+                r.student_name === viewingStudent.student_name
+            ) || null
+          }
+          onClose={() => setViewingStudent(null)}
+        />
+      )}
     </main>
   );
 }
@@ -599,6 +669,7 @@ function GroupCard({
   onUpdate,
   onDelete,
   onUnassign,
+  onViewStudent,
 }: {
   group: GroupView;
   onUpdate: (patch: {
@@ -609,6 +680,7 @@ function GroupCard({
   }) => void;
   onDelete: () => void;
   onUnassign: (memberId: string) => void;
+  onViewStudent: (member: Member) => void;
 }) {
   const [name, setName] = useState(group.name);
   const [capacity, setCapacity] = useState(group.capacity);
@@ -715,7 +787,13 @@ function GroupCard({
                   key={m.id}
                   className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px]"
                 >
-                  <span className="font-semibold">{m.student_name}</span>
+                  <button
+                    onClick={() => onViewStudent(m)}
+                    title="제출물 보기"
+                    className="font-semibold hover:text-indigo-600 hover:underline"
+                  >
+                    {m.student_name}
+                  </button>
                   {role && (
                     <span className="text-slate-500">— {role.role_name}</span>
                   )}
@@ -734,8 +812,141 @@ function GroupCard({
       </div>
 
       <p className="text-[10px] text-slate-400">
-        성찰문 제출 {group.reflectionCount}명
+        활동 기록 {group.activityCount}명 · 성찰문 {group.reflectionCount}명
       </p>
     </article>
+  );
+}
+
+function StudentSubmissionsModal({
+  member,
+  group,
+  activity,
+  reflection,
+  onClose,
+}: {
+  member: Member;
+  group: Group | null;
+  activity: ActivityRecord | null;
+  reflection: Reflection | null;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div>
+            <p className="text-xs font-semibold text-indigo-600">
+              {group ? group.name : "미배정"} · 학생 제출물
+            </p>
+            <h2 className="text-xl font-bold text-slate-900">
+              {member.student_name}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200"
+          >
+            닫기
+          </button>
+        </div>
+
+        {/* 내용 */}
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          {/* 활동 기록 */}
+          <section>
+            <h3 className="mb-2 text-sm font-bold text-slate-900">
+              활동 기록
+              {activity && (
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  마지막 저장 {new Date(activity.updated_at).toLocaleString("ko-KR")}
+                </span>
+              )}
+            </h3>
+            {!activity ? (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-400">
+                아직 제출되지 않았습니다.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <SubmissionField
+                  label="AI 동료가 필요로 한 도움"
+                  value={activity.ai_needs}
+                />
+                <SubmissionField
+                  label="AI 동료가 기여할 수 있는 강점"
+                  value={activity.ai_strengths}
+                />
+                <SubmissionField
+                  label="우리 모둠의 해결안"
+                  value={activity.group_solution}
+                />
+                <SubmissionField
+                  label="AI 동료에게 받은 피드백"
+                  value={activity.ai_feedback}
+                />
+                <SubmissionField
+                  label="최종 수정 내용"
+                  value={activity.final_revision}
+                />
+              </div>
+            )}
+          </section>
+
+          {/* 성찰문 */}
+          <section>
+            <h3 className="mb-2 text-sm font-bold text-slate-900">
+              성찰문
+              {reflection && (
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  마지막 저장 {new Date(reflection.updated_at).toLocaleString("ko-KR")}
+                </span>
+              )}
+            </h3>
+            {!reflection ? (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-400">
+                아직 제출되지 않았습니다.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {reflectionQuestions.map((q, idx) => (
+                  <SubmissionField
+                    key={q}
+                    label={`${idx + 1}. ${q}`}
+                    value={reflection.answers[idx] || ""}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubmissionField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-semibold text-slate-700">{label}</p>
+      <p className="whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-800">
+        {value || (
+          <span className="text-slate-400">— 빈 칸 —</span>
+        )}
+      </p>
+    </div>
   );
 }

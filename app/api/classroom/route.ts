@@ -452,19 +452,24 @@ export async function POST(req: NextRequest) {
       const groupIds = (groups || []).map((g) => g.id);
       const safeIds = groupIds.length > 0 ? groupIds : [""];
 
-      const [{ data: allMembers }, { data: roles }, { data: reflections }] =
-        await Promise.all([
-          supabase
-            .from("members")
-            .select("*")
-            .eq("lesson_id", lessonId)
-            .order("joined_at"),
-          supabase
-            .from("role_assignments")
-            .select("*")
-            .in("group_id", safeIds),
-          supabase.from("reflections").select("*").in("group_id", safeIds),
-        ]);
+      const [
+        { data: allMembers },
+        { data: roles },
+        { data: reflections },
+        { data: activityRecords },
+      ] = await Promise.all([
+        supabase
+          .from("members")
+          .select("*")
+          .eq("lesson_id", lessonId)
+          .order("joined_at"),
+        supabase
+          .from("role_assignments")
+          .select("*")
+          .in("group_id", safeIds),
+        supabase.from("reflections").select("*").in("group_id", safeIds),
+        supabase.from("activity_records").select("*").in("group_id", safeIds),
+      ]);
 
       const groupsView = (groups || []).map((g) => ({
         ...g,
@@ -473,11 +478,20 @@ export async function POST(req: NextRequest) {
         reflectionCount: (reflections || []).filter(
           (r) => r.group_id === g.id
         ).length,
+        activityCount: (activityRecords || []).filter(
+          (r) => r.group_id === g.id
+        ).length,
       }));
 
       const unassigned = (allMembers || []).filter((m) => !m.group_id);
 
-      return json({ lesson, groups: groupsView, unassigned });
+      return json({
+        lesson,
+        groups: groupsView,
+        unassigned,
+        activityRecords: activityRecords || [],
+        reflections: reflections || [],
+      });
     }
 
     // ───── 학생: 수업 코드 조회 (입장 화면용) ─────
