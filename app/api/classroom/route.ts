@@ -358,6 +358,81 @@ export async function POST(req: NextRequest) {
       return json({ ok: true });
     }
 
+    // ───── 교사: 수업 삭제 (모둠·멤버·메시지 CASCADE) ─────
+    if (action === "deleteLesson") {
+      const lessonId = body.lessonId as string;
+      const { error } = await supabase
+        .from("lessons")
+        .delete()
+        .eq("id", lessonId);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    // ───── 교사: 수업 복제 (새 코드 발급, 같은 페르소나 4모둠) ─────
+    if (action === "duplicateLesson") {
+      const lessonId = body.lessonId as string;
+      const { data: src, error: e0 } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", lessonId)
+        .single();
+      if (e0 || !src)
+        return json({ error: "복제할 수업을 찾을 수 없습니다." }, 404);
+
+      const { data: srcGroups } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .order("position");
+
+      const newId = makeId("lesson");
+      const newLesson = {
+        id: newId,
+        title: src.title,
+        topic: src.topic,
+        objective: src.objective,
+        persona_type: src.persona_type,
+        persona_name: src.persona_name,
+      };
+
+      const { data: lesson, error: e1 } = await supabase
+        .from("lessons")
+        .insert(newLesson)
+        .select()
+        .single();
+      if (e1) throw e1;
+
+      // 원본 모둠 구성 그대로 복제 (이름·정원·페르소나 유지, 학생만 비움)
+      const newGroups =
+        (srcGroups || []).length > 0
+          ? srcGroups!.map((g) => ({
+              id: makeId("group"),
+              lesson_id: newId,
+              name: g.name,
+              capacity: g.capacity,
+              position: g.position,
+              persona_type: g.persona_type,
+              persona_name: g.persona_name,
+            }))
+          : [
+              {
+                id: makeId("group"),
+                lesson_id: newId,
+                name: "1모둠",
+                capacity: 4,
+                position: 1,
+                persona_type: src.persona_type,
+                persona_name: src.persona_name,
+              },
+            ];
+
+      const { error: e2 } = await supabase.from("groups").insert(newGroups);
+      if (e2) throw e2;
+
+      return json({ lesson });
+    }
+
     // ───── 교사: 대시보드 (수업 + 모둠 + 멤버 + 활동기록 카운트) ─────
     if (action === "getLessonDashboard") {
       const lessonId = body.lessonId as string;

@@ -156,6 +156,44 @@ export default function TeacherPage() {
     }
   }
 
+  async function regenerateCode() {
+    if (!selectedLesson) return;
+    if (
+      !confirm(
+        "현재 수업의 구성을 그대로 복제해 새 코드를 발급합니다. 진행할까요?"
+      )
+    )
+      return;
+    try {
+      const res = await api("duplicateLesson", { lessonId: selectedLesson.id });
+      await loadLessons();
+      await refreshDashboard(res.lesson.id);
+      flash(`새 코드 발급: ${res.lesson.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류");
+    }
+  }
+
+  async function deleteLesson() {
+    if (!selectedLesson) return;
+    if (
+      !confirm(
+        `'${selectedLesson.title}' 수업을 삭제할까요? 모둠·학생·채팅 모두 함께 삭제됩니다.`
+      )
+    )
+      return;
+    try {
+      await api("deleteLesson", { lessonId: selectedLesson.id });
+      setSelectedLesson(null);
+      setGroups([]);
+      setUnassigned([]);
+      await loadLessons();
+      flash("수업 삭제됨");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류");
+    }
+  }
+
   async function assignMember(memberId: string, groupId: string) {
     if (!selectedLesson || !groupId) return;
     try {
@@ -337,22 +375,38 @@ export default function TeacherPage() {
             {selectedLesson && (
               <>
                 {/* 학생 입장 안내 (한 줄) */}
-                <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-indigo-50 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-indigo-50 px-4 py-3">
                   <p className="text-sm font-bold text-slate-900">
                     {selectedLesson.title}
                   </p>
                   <p className="font-mono text-xs font-bold text-indigo-900">
                     코드 · {selectedLesson.id}
                   </p>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(studentUrl);
-                      flash("학생 접속 링크 복사됨");
-                    }}
-                    className="ml-auto rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100"
-                  >
-                    학생 링크 복사
-                  </button>
+                  <div className="ml-auto flex flex-wrap gap-1.5">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(studentUrl);
+                        flash("학생 접속 링크 복사됨");
+                      }}
+                      className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100"
+                    >
+                      학생 링크 복사
+                    </button>
+                    <button
+                      onClick={regenerateCode}
+                      title="현재 수업을 복제해 새 코드 발급"
+                      className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50"
+                    >
+                      새 코드 발급
+                    </button>
+                    <button
+                      onClick={deleteLesson}
+                      title="현재 수업 전체 삭제"
+                      className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                    >
+                      수업 삭제
+                    </button>
+                  </div>
                 </div>
 
                 {/* 모둠 구성창 (한 덩어리) */}
