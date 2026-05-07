@@ -25,6 +25,10 @@ Thumbs.db
 # Claude Code 세션 파일
 .claude/
 
+# MS Word 임시 잠금 파일
+~$*.docx
+~$*.doc
+
 # ===== 빌드/의존성 =====
 node_modules/
 dist/
