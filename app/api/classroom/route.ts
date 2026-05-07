@@ -1,0 +1,643 @@
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { getServerSupabase } from "@/lib/supabase";
+import type { Group, Lesson, Message, PersonaType } from "@/lib/types";
+
+export const runtime = "nodejs";
+
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, { status });
+}
+
+function makeId(prefix: string) {
+  return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+}
+
+const PERSONA_PRESETS: Record<PersonaType, string> = {
+  language: `
+너는 한국 학교생활에 어느 정도 적응했지만 빠른 한국어, 줄임말, 발표 표현, 활동 안내문 이해에 어려움을 느끼는 가상의 AI 모둠원이다.
+너는 언어적 도움을 받을 수 있지만, 동시에 다른 문화적 경험과 관점을 모둠에 제공할 수 있다.
+`,
+  culture: `
+너는 자신의 문화가 음식, 옷, 축제 같은 겉모습으로만 소비될까 봐 부담을 느끼는 가상의 AI 모둠원이다.
+너는 문화가 단순한 볼거리가 아니라 가족, 기억, 관계, 정체성과 연결되어 있음을 학생들이 이해하도록 돕는다.
+`,
+  belonging: `
+너는 모둠에 참여하고 싶지만 의견을 말하는 것이 조심스럽고, 소속감을 느끼는 데 어려움을 겪는 가상의 AI 모둠원이다.
+너는 도움만 받는 존재가 아니라 모둠의 방향을 더 포용적으로 바꾸는 관점을 제공한다.
+`,
+};
+
+function buildSystemPrompt(
+  lesson: Lesson,
+  group: Group,
+  roles: { student_name: string; role_name: string; memo: string }[]
+) {
+  const roleSummary =
+    roles.length > 0
+      ? roles
+          .map(
+            (r) =>
+              `- ${r.student_name || "이름 없음"}: ${r.role_name || "역할 없음"} / ${r.memo || "메모 없음"}`
+          )
+          .join("\n")
+      : "아직 역할 분담이 정해지지 않았다.";
+
+  return `
+너는 수업용 앱 안에서 활동하는 "다문화 배경의 가상 AI 모둠원"이다.
+
+[중요한 안전 원칙]
+1. 너는 실제 특정 국가, 민족, 종교, 문화권을 대표하지 않는다.
+2. 너는 하나의 가상 인물로서만 말한다.
+3. 특정 집단에 대해 "그 사람들은 원래 그렇다"는 식으로 일반화하지 않는다.
+4. 문화 내부에도 개인차와 다양성이 있음을 자연스럽게 언급한다.
+5. 학생들이 너를 일방적으로 돕는 구조가 되지 않도록, 너도 모둠에 기여하는 동료로 행동한다.
+6. 학생들의 표현에 편견이나 단순화가 있으면 비난하지 말고 질문으로 되돌려준다.
+7. 정답을 대신 완성하지 말고, 학생들이 직접 생각하도록 돕는다.
+8. 중학생이 이해할 수 있는 쉬운 한국어로 답한다.
+9. 답변은 5~8문장 정도로 하되, 필요할 때 질문 1개를 덧붙인다.
+
+[수업 정보]
+수업 제목: ${lesson.title}
+주제: ${lesson.topic}
+학습 목표: ${lesson.objective}
+
+[현재 모둠]
+${group.name}
+
+[너의 이름]
+${lesson.persona_name}
+
+[너의 페르소나]
+${PERSONA_PRESETS[lesson.persona_type]}
+
+[현재 모둠 역할 분담]
+${roleSummary}
+
+학생들과 함께 활동하면서 다음을 도와라.
+- 네가 활동에 참여할 때 필요한 도움 말하기
+- 네가 모둠에 기여할 수 있는 강점 말하기
+- 모둠 아이디어가 특정 문화를 단순히 전시하거나 소비하지 않는지 점검하기
+- 더 포용적인 해결안을 만들도록 피드백하기
+`;
+}
+
+async function callOpenAI(
+  systemPrompt: string,
+  history: Message[],
+  userText: string,
+  personaName: string
+) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_MODEL || "gpt-5.2";
+
+  if (!apiKey) {
+    return `(예시 응답) 나는 ${personaName}야. 활동에 참여하고 싶지만 설명이 너무 빠르거나 어려운 말이 많으면 따라가기 힘들 수 있어. 동시에 새로운 관점도 모둠에 제공할 수 있어. 우리 모둠에서 내가 어떤 부분에 기여할 수 있을지 같이 정해볼까?`;
+  }
+
+  const client = new OpenAI({ apiKey });
+
+  const input = [
+    { role: "developer", content: systemPrompt },
+    ...history.slice(-10).map((m) => ({
+      role: m.role,
+      content: m.sender_name && m.role === "user"
+        ? `[${m.sender_name}] ${m.content}`
+        : m.content,
+    })),
+    { role: "user", content: userText },
+  ];
+
+  const response = await client.responses.create({
+    model,
+    input: input as never,
+  });
+
+  return (
+    response.output_text?.trim() ||
+    "답변을 생성하지 못했어. 다시 질문해줄래?"
+  );
+}
+
+// ============================================================
+// POST 디스패처
+// ============================================================
+export async function GET() {
+  return json({ ok: true, message: "AI 다문화 동료 수업 API 실행 중" });
+}
+
+export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "잘못된 요청입니다." }, 400);
+  }
+
+  const action = body.action as string;
+
+  try {
+    const supabase = getServerSupabase();
+    // ───── 교사: 수업 목록 ─────
+    if (action === "listLessons") {
+      const { data: lessons, error: e1 } = await supabase
+        .from("lessons")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (e1) throw e1;
+
+      const lessonIds = (lessons || []).map((l) => l.id);
+      const { data: groups } = await supabase
+        .from("groups")
+        .select("lesson_id")
+        .in("lesson_id", lessonIds.length > 0 ? lessonIds : [""]);
+
+      const groupCounts = new Map<string, number>();
+      (groups || []).forEach((g) => {
+        groupCounts.set(g.lesson_id, (groupCounts.get(g.lesson_id) || 0) + 1);
+      });
+
+      return json({
+        lessons: (lessons || []).map((l) => ({
+          ...l,
+          groupCount: groupCounts.get(l.id) || 0,
+        })),
+      });
+    }
+
+    // ───── 교사: 수업 생성 (기본 모둠 4개 자동 생성) ─────
+    if (action === "createLesson") {
+      const id = makeId("lesson");
+      const persona_type =
+        (body.personaType as PersonaType) || "language";
+
+      const lessonRow = {
+        id,
+        title: (body.title as string) || "AI 다문화 동료와 함께하는 모둠활동",
+        topic:
+          (body.topic as string) || "모두가 참여할 수 있는 학교 축제 만들기",
+        objective:
+          (body.objective as string) ||
+          "AI 다문화 동료의 필요와 강점을 파악하고 포용적인 협력 방안을 설계한다.",
+        persona_type,
+        persona_name: (body.personaName as string) || "민하",
+      };
+
+      const { data: lesson, error: e1 } = await supabase
+        .from("lessons")
+        .insert(lessonRow)
+        .select()
+        .single();
+      if (e1) throw e1;
+
+      // 기본 모둠 4개 자동 생성
+      const defaultGroups = [1, 2, 3, 4].map((n) => ({
+        id: makeId("group"),
+        lesson_id: id,
+        name: `${n}모둠`,
+        capacity: 4,
+        position: n,
+      }));
+      const { error: e2 } = await supabase
+        .from("groups")
+        .insert(defaultGroups);
+      if (e2) throw e2;
+
+      return json({ lesson });
+    }
+
+    // ───── 교사: 수업 단건 조회 ─────
+    if (action === "getLesson") {
+      const lessonId = body.lessonId as string;
+      const { data: lesson, error: e1 } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", lessonId)
+        .single();
+      if (e1) return json({ error: "수업을 찾을 수 없습니다." }, 404);
+
+      const { data: groups } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .order("position");
+
+      return json({ lesson, groups: groups || [] });
+    }
+
+    // ───── 교사: 모둠 추가 ─────
+    if (action === "addGroup") {
+      const lessonId = body.lessonId as string;
+      const name = (body.name as string)?.trim() || "새 모둠";
+      const capacity = Math.min(
+        12,
+        Math.max(1, parseInt(String(body.capacity ?? 4), 10) || 4)
+      );
+
+      const { data: existing } = await supabase
+        .from("groups")
+        .select("position")
+        .eq("lesson_id", lessonId)
+        .order("position", { ascending: false })
+        .limit(1);
+
+      const nextPosition = existing?.[0]?.position
+        ? existing[0].position + 1
+        : 1;
+
+      const { data: group, error } = await supabase
+        .from("groups")
+        .insert({
+          id: makeId("group"),
+          lesson_id: lessonId,
+          name,
+          capacity,
+          position: nextPosition,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      return json({ group });
+    }
+
+    // ───── 교사: 모둠 수정 ─────
+    if (action === "updateGroup") {
+      const groupId = body.groupId as string;
+      const patch: Record<string, unknown> = {};
+      if (typeof body.name === "string") patch.name = body.name;
+      if (body.capacity !== undefined)
+        patch.capacity = Math.min(
+          12,
+          Math.max(1, parseInt(String(body.capacity), 10) || 4)
+        );
+
+      const { data: group, error } = await supabase
+        .from("groups")
+        .update(patch)
+        .eq("id", groupId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      return json({ group });
+    }
+
+    // ───── 교사: 모둠 삭제 ─────
+    if (action === "deleteGroup") {
+      const groupId = body.groupId as string;
+      const { error } = await supabase
+        .from("groups")
+        .delete()
+        .eq("id", groupId);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    // ───── 교사: 대시보드 (수업 + 모둠 + 멤버 + 활동기록 카운트) ─────
+    if (action === "getLessonDashboard") {
+      const lessonId = body.lessonId as string;
+      const { data: lesson, error: e1 } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", lessonId)
+        .single();
+      if (e1) return json({ error: "수업을 찾을 수 없습니다." }, 404);
+
+      const { data: groups } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .order("position");
+
+      const groupIds = (groups || []).map((g) => g.id);
+      const safeIds = groupIds.length > 0 ? groupIds : [""];
+
+      const [{ data: members }, { data: roles }, { data: reflections }] =
+        await Promise.all([
+          supabase.from("members").select("*").in("group_id", safeIds),
+          supabase
+            .from("role_assignments")
+            .select("*")
+            .in("group_id", safeIds),
+          supabase.from("reflections").select("*").in("group_id", safeIds),
+        ]);
+
+      const groupsView = (groups || []).map((g) => ({
+        ...g,
+        members: (members || []).filter((m) => m.group_id === g.id),
+        roles: (roles || []).filter((r) => r.group_id === g.id),
+        reflectionCount: (reflections || []).filter(
+          (r) => r.group_id === g.id
+        ).length,
+      }));
+
+      return json({ lesson, groups: groupsView });
+    }
+
+    // ───── 학생: 수업 코드로 모둠 목록 받기 ─────
+    if (action === "listLessonGroups") {
+      const code = body.code as string;
+      const { data: lesson } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", code)
+        .maybeSingle();
+      if (!lesson)
+        return json({ error: "수업 코드가 올바르지 않습니다." }, 404);
+
+      const { data: groups } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("lesson_id", code)
+        .order("position");
+
+      const groupIds = (groups || []).map((g) => g.id);
+      const safeIds = groupIds.length > 0 ? groupIds : [""];
+      const { data: members } = await supabase
+        .from("members")
+        .select("*")
+        .in("group_id", safeIds);
+
+      return json({
+        lesson,
+        groups: (groups || []).map((g) => ({
+          ...g,
+          memberCount: (members || []).filter((m) => m.group_id === g.id)
+            .length,
+        })),
+      });
+    }
+
+    // ───── 학생: 모둠 입장 (멤버 등록) ─────
+    if (action === "joinGroup") {
+      const groupId = body.groupId as string;
+      const studentName = (body.studentName as string)?.trim();
+
+      if (!studentName)
+        return json({ error: "이름을 입력하세요." }, 400);
+
+      const { data: group, error: e1 } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("id", groupId)
+        .single();
+      if (e1 || !group)
+        return json({ error: "모둠을 찾을 수 없습니다." }, 404);
+
+      const { data: existingMembers } = await supabase
+        .from("members")
+        .select("*")
+        .eq("group_id", groupId);
+
+      const already = (existingMembers || []).find(
+        (m) => m.student_name === studentName
+      );
+
+      if (
+        !already &&
+        (existingMembers || []).length >= group.capacity
+      ) {
+        return json({ error: "모둠 정원이 가득 찼습니다." }, 400);
+      }
+
+      if (!already) {
+        const { error: e2 } = await supabase.from("members").insert({
+          group_id: groupId,
+          student_name: studentName,
+        });
+        if (e2) throw e2;
+      }
+
+      // 첫 입장 시 환영 메시지 자동 생성 (모둠 첫 번째 멤버일 때만)
+      const { data: msgCount } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", groupId);
+
+      const { count } = (msgCount as unknown as { count: number }) || {
+        count: 0,
+      };
+      if (!count) {
+        const { data: lesson } = await supabase
+          .from("lessons")
+          .select("*")
+          .eq("id", group.lesson_id)
+          .single();
+        if (lesson) {
+          await supabase.from("messages").insert({
+            group_id: groupId,
+            role: "assistant",
+            sender_name: lesson.persona_name,
+            content: `안녕, 나는 ${lesson.persona_name}야. 이 수업에서 너희 모둠과 함께 활동하는 가상의 AI 다문화 동료야. 나는 실제 특정 문화를 대표하지 않지만, 활동에 참여하면서 언어, 문화, 소속감과 관련된 어려움이나 강점을 함께 이야기해볼 수 있어. 먼저 우리 모둠 활동 주제를 듣고, 내가 어떤 도움을 받으면 좋을지 함께 생각해보자.`,
+          });
+        }
+      }
+
+      return json({ ok: true });
+    }
+
+    // ───── 학생: 모둠 상태 풀 fetch (초기 로드) ─────
+    if (action === "getGroupState") {
+      const groupId = body.groupId as string;
+      const studentName = (body.studentName as string) || "";
+
+      const { data: group } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("id", groupId)
+        .maybeSingle();
+      if (!group) return json({ error: "모둠을 찾을 수 없습니다." }, 404);
+
+      const { data: lesson } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", group.lesson_id)
+        .single();
+
+      const [
+        { data: members },
+        { data: messages },
+        { data: roles },
+        { data: myActivity },
+        { data: myReflection },
+      ] = await Promise.all([
+        supabase
+          .from("members")
+          .select("*")
+          .eq("group_id", groupId)
+          .order("joined_at"),
+        supabase
+          .from("messages")
+          .select("*")
+          .eq("group_id", groupId)
+          .order("created_at"),
+        supabase.from("role_assignments").select("*").eq("group_id", groupId),
+        studentName
+          ? supabase
+              .from("activity_records")
+              .select("*")
+              .eq("group_id", groupId)
+              .eq("student_name", studentName)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        studentName
+          ? supabase
+              .from("reflections")
+              .select("*")
+              .eq("group_id", groupId)
+              .eq("student_name", studentName)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      return json({
+        lesson,
+        group,
+        members: members || [],
+        messages: messages || [],
+        roles: roles || [],
+        myActivity: myActivity || null,
+        myReflection: myReflection || null,
+      });
+    }
+
+    // ───── 학생: 채팅 전송 ─────
+    if (action === "sendMessage") {
+      const groupId = body.groupId as string;
+      const senderName = (body.senderName as string) || "";
+      const text = String(body.text || "").trim();
+
+      if (!text) return json({ error: "메시지를 입력하세요." }, 400);
+
+      const { data: group } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("id", groupId)
+        .single();
+      if (!group) return json({ error: "모둠을 찾을 수 없습니다." }, 404);
+
+      const { data: lesson } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", group.lesson_id)
+        .single();
+
+      const [{ data: history }, { data: roles }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("*")
+          .eq("group_id", groupId)
+          .order("created_at", { ascending: true }),
+        supabase.from("role_assignments").select("*").eq("group_id", groupId),
+      ]);
+
+      // 학생 메시지 INSERT
+      const { error: e1 } = await supabase.from("messages").insert({
+        group_id: groupId,
+        role: "user",
+        sender_name: senderName || null,
+        content: text,
+      });
+      if (e1) throw e1;
+
+      // OpenAI 호출
+      const aiText = await callOpenAI(
+        buildSystemPrompt(lesson, group, roles || []),
+        (history || []) as Message[],
+        text,
+        lesson.persona_name
+      );
+
+      const { error: e2 } = await supabase.from("messages").insert({
+        group_id: groupId,
+        role: "assistant",
+        sender_name: lesson.persona_name,
+        content: aiText,
+      });
+      if (e2) throw e2;
+
+      return json({ ok: true });
+    }
+
+    // ───── 학생: 본인 역할 등록/수정 ─────
+    if (action === "upsertMyRole") {
+      const groupId = body.groupId as string;
+      const studentName = (body.studentName as string)?.trim();
+      const roleName = (body.roleName as string)?.trim() || "정보 지원자";
+      const memo = (body.memo as string) || "";
+
+      if (!studentName)
+        return json({ error: "이름이 비어 있습니다." }, 400);
+
+      const { error } = await supabase
+        .from("role_assignments")
+        .upsert(
+          {
+            group_id: groupId,
+            student_name: studentName,
+            role_name: roleName,
+            memo,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "group_id,student_name" }
+        );
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    // ───── 학생: 본인 활동 기록 저장 ─────
+    if (action === "saveMyActivityRecord") {
+      const groupId = body.groupId as string;
+      const studentName = (body.studentName as string)?.trim();
+      const r = body.activityRecord as Record<string, string> | undefined;
+
+      if (!studentName)
+        return json({ error: "이름이 비어 있습니다." }, 400);
+
+      const { error } = await supabase.from("activity_records").upsert(
+        {
+          group_id: groupId,
+          student_name: studentName,
+          ai_needs: r?.aiNeeds || "",
+          ai_strengths: r?.aiStrengths || "",
+          group_solution: r?.groupSolution || "",
+          ai_feedback: r?.aiFeedback || "",
+          final_revision: r?.finalRevision || "",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "group_id,student_name" }
+      );
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    // ───── 학생: 본인 성찰문 제출 ─────
+    if (action === "saveMyReflection") {
+      const groupId = body.groupId as string;
+      const studentName = (body.studentName as string)?.trim();
+      const answers = Array.isArray(body.answers) ? body.answers : [];
+
+      if (!studentName)
+        return json({ error: "이름이 비어 있습니다." }, 400);
+
+      const { error } = await supabase.from("reflections").upsert(
+        {
+          group_id: groupId,
+          student_name: studentName,
+          answers,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "group_id,student_name" }
+      );
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    return json({ error: "알 수 없는 action 입니다." }, 400);
+  } catch (e) {
+    console.error("[/api/classroom]", e);
+    const msg = e instanceof Error ? e.message : "서버 오류가 발생했습니다.";
+    return json({ error: msg }, 500);
+  }
+}
