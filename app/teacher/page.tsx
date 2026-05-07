@@ -66,8 +66,6 @@ export default function TeacherPage() {
   const [objective, setObjective] = useState(
     "AI 다문화 동료의 필요와 강점을 파악하고 포용적인 협력 방안을 설계한다."
   );
-  const [personaName, setPersonaName] = useState("민하");
-  const [personaType, setPersonaType] = useState("language");
 
   const [error, setError] = useState("");
   const [savedFlash, setSavedFlash] = useState("");
@@ -104,8 +102,6 @@ export default function TeacherPage() {
         title,
         topic,
         objective,
-        personaName,
-        personaType,
       });
       await loadLessons();
       await refreshDashboard(data.lesson.id);
@@ -283,26 +279,11 @@ export default function TeacherPage() {
                 />
               </Field>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="AI 동료 이름">
-                  <input
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm"
-                    value={personaName}
-                    onChange={(e) => setPersonaName(e.target.value)}
-                  />
-                </Field>
-                <Field label="페르소나 유형">
-                  <select
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm"
-                    value={personaType}
-                    onChange={(e) => setPersonaType(e.target.value)}
-                  >
-                    <option value="language">언어 적응형</option>
-                    <option value="culture">문화 오해형</option>
-                    <option value="belonging">소속감 고민형</option>
-                  </select>
-                </Field>
-              </div>
+              <p className="mb-3 text-xs leading-5 text-slate-500">
+                수업 생성 시 모둠 4개가 서로 다른 AI 페르소나로 자동 구성됩니다.
+                생성 후 우측 모둠 구성창에서 각 모둠의 AI 동료 이름·유형을
+                자유롭게 변경할 수 있어요.
+              </p>
 
               <button
                 onClick={createLesson}

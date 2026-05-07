@@ -224,16 +224,26 @@ export async function POST(req: NextRequest) {
         .single();
       if (e1) throw e1;
 
-      // 기본 모둠 4개 자동 생성 — 모두 lesson 의 페르소나로 시작
-      // 교사는 이후 모둠별로 페르소나를 다르게 변경 가능
-      const defaultGroups = [1, 2, 3, 4].map((n) => ({
+      // 기본 모둠 4개 자동 생성 — 서로 다른 페르소나로 시작
+      // (시연 시 학생들이 모둠마다 다른 다문화 동료를 경험하도록)
+      const defaultPersonaMix: {
+        type: PersonaType;
+        name: string;
+      }[] = [
+        { type: "language", name: "민하" },
+        { type: "culture", name: "지우" },
+        { type: "belonging", name: "선재" },
+        { type: "language", name: "하늘" },
+      ];
+
+      const defaultGroups = [1, 2, 3, 4].map((n, i) => ({
         id: makeId("group"),
         lesson_id: id,
         name: `${n}모둠`,
         capacity: 4,
         position: n,
-        persona_type: lessonRow.persona_type,
-        persona_name: lessonRow.persona_name,
+        persona_type: defaultPersonaMix[i].type,
+        persona_name: defaultPersonaMix[i].name,
       }));
       const { error: e2 } = await supabase
         .from("groups")
