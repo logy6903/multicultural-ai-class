@@ -91,12 +91,20 @@ async function ensureWelcomeMessage(
   if (!lesson) return;
 
   const personaName = group.persona_name || lesson.persona_name;
+  const personaType = (group.persona_type ||
+    lesson.persona_type) as PersonaType;
+
+  const openings: Record<PersonaType, string> = {
+    language: `안녕, 나는 ${personaName}이야. 이 수업에 같이 참여하는 가상의 AI 모둠원이야. 일상 한국어는 괜찮은데 학교에서 자주 쓰이는 줄임말이나 격식 표현·전문 용어에서 종종 막혀. 시작하기 전에 첫 질문 하나 — 너희가 다룰 이번 주제, 가장 핵심이 되는 단어 한두 개를 나한테 쉬운 말로 한 번 풀어 줄 수 있어? 그 단어들이 한국 학교에서 어떻게 쓰이는지부터 알아야 따라갈 수 있을 것 같아서.`,
+    culture: `안녕, 나는 ${personaName}이야. 이 수업에 같이 참여하는 가상의 AI 모둠원. 우리 가족 이야기를 풀어 말할 때 한국에서 흔히 쓰는 카테고리에 잘 안 들어맞을 때가 종종 있어. 본격적으로 시작하기 전에 한 가지 같이 정해보고 싶어 — 너희 모둠이 만들 산출물에서 '다문화 학생'은 어떤 자리에 놓일까? '챙겨줘야 할 대상' 말고 다른 가능성도 있을 것 같은데, 어디서부터 시작할 거야?`,
+    belonging: `안녕, 나는 ${personaName}이야. 이 수업에 같이 참여하는 가상의 AI 모둠원. 의견 내는 게 좀 망설여지는 편이라 짧게 말할 수도 있어. 시작 전에 하나만 같이 생각해 봤으면 해서... 너희 산출물에 '학생이 편하게 말할 수 있게 한다' 같은 항목이 들어간다면, 어떻게 해야 진짜로 편해질까? '편하게 말해도 돼'라는 말로는 부족할 것 같아서.`,
+  };
 
   await supabase.from("messages").insert({
     group_id: groupId,
     role: "assistant",
     sender_name: personaName,
-    content: `안녕, 나는 ${personaName}야. 이 수업에서 너희 모둠과 함께 활동하는 가상의 AI 다문화 동료야. 나는 실제 특정 문화를 대표하지 않지만, 활동에 참여하면서 언어, 문화, 소속감과 관련된 어려움이나 강점을 함께 이야기해볼 수 있어. 먼저 우리 모둠 활동 주제를 듣고, 내가 어떤 도움을 받으면 좋을지 함께 생각해보자.`,
+    content: openings[personaType] || openings.language,
   });
 }
 
