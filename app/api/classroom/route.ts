@@ -28,6 +28,38 @@ const PERSONA_PRESETS: Record<PersonaType, string> = {
 `,
 };
 
+async function ensureWelcomeMessage(
+  supabase: ReturnType<typeof getServerSupabase>,
+  groupId: string
+) {
+  const { count } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("group_id", groupId);
+  if (count && count > 0) return;
+
+  const { data: group } = await supabase
+    .from("groups")
+    .select("*")
+    .eq("id", groupId)
+    .maybeSingle();
+  if (!group) return;
+
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("*")
+    .eq("id", group.lesson_id)
+    .maybeSingle();
+  if (!lesson) return;
+
+  await supabase.from("messages").insert({
+    group_id: groupId,
+    role: "assistant",
+    sender_name: lesson.persona_name,
+    content: `안녕, 나는 ${lesson.persona_name}야. 이 수업에서 너희 모둠과 함께 활동하는 가상의 AI 다문화 동료야. 나는 실제 특정 문화를 대표하지 않지만, 활동에 참여하면서 언어, 문화, 소속감과 관련된 어려움이나 강점을 함께 이야기해볼 수 있어. 먼저 우리 모둠 활동 주제를 듣고, 내가 어떤 도움을 받으면 좋을지 함께 생각해보자.`,
+  });
+}
+
 function buildSystemPrompt(
   lesson: Lesson,
   group: Group,
@@ -230,7 +262,7 @@ export async function POST(req: NextRequest) {
       const lessonId = body.lessonId as string;
       const name = (body.name as string)?.trim() || "새 모둠";
       const capacity = Math.min(
-        12,
+        5,
         Math.max(1, parseInt(String(body.capacity ?? 4), 10) || 4)
       );
 
@@ -268,7 +300,7 @@ export async function POST(req: NextRequest) {
       if (typeof body.name === "string") patch.name = body.name;
       if (body.capacity !== undefined)
         patch.capacity = Math.min(
-          12,
+          5,
           Math.max(1, parseInt(String(body.capacity), 10) || 4)
         );
 
@@ -313,9 +345,13 @@ export async function POST(req: NextRequest) {
       const groupIds = (groups || []).map((g) => g.id);
       const safeIds = groupIds.length > 0 ? groupIds : [""];
 
-      const [{ data: members }, { data: roles }, { data: reflections }] =
+      const [{ data: allMembers }, { data: roles }, { data: reflections }] =
         await Promise.all([
-          supabase.from("members").select("*").in("group_id", safeIds),
+          supabase
+            .from("members")
+            .select("*")
+            .eq("lesson_id", lessonId)
+            .order("joined_at"),
           supabase
             .from("role_assignments")
             .select("*")
@@ -325,18 +361,20 @@ export async function POST(req: NextRequest) {
 
       const groupsView = (groups || []).map((g) => ({
         ...g,
-        members: (members || []).filter((m) => m.group_id === g.id),
+        members: (allMembers || []).filter((m) => m.group_id === g.id),
         roles: (roles || []).filter((r) => r.group_id === g.id),
         reflectionCount: (reflections || []).filter(
           (r) => r.group_id === g.id
         ).length,
       }));
 
-      return json({ lesson, groups: groupsView });
+      const unassigned = (allMembers || []).filter((m) => !m.group_id);
+
+      return json({ lesson, groups: groupsView, unassigned });
     }
 
-    // ───── 학생: 수업 코드로 모둠 목록 받기 ─────
-    if (action === "listLessonGroups") {
+    // ───── 학생: 수업 코드 조회 (입장 화면용) ─────
+    if (action === "lookupLesson") {
       const code = body.code as string;
       const { data: lesson } = await supabase
         .from("lessons")
@@ -345,96 +383,172 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       if (!lesson)
         return json({ error: "수업 코드가 올바르지 않습니다." }, 404);
-
-      const { data: groups } = await supabase
-        .from("groups")
-        .select("*")
-        .eq("lesson_id", code)
-        .order("position");
-
-      const groupIds = (groups || []).map((g) => g.id);
-      const safeIds = groupIds.length > 0 ? groupIds : [""];
-      const { data: members } = await supabase
-        .from("members")
-        .select("*")
-        .in("group_id", safeIds);
-
-      return json({
-        lesson,
-        groups: (groups || []).map((g) => ({
-          ...g,
-          memberCount: (members || []).filter((m) => m.group_id === g.id)
-            .length,
-        })),
-      });
+      return json({ lesson });
     }
 
-    // ───── 학생: 모둠 입장 (멤버 등록) ─────
-    if (action === "joinGroup") {
-      const groupId = body.groupId as string;
+    // ───── 학생: 수업 입장 (모둠 미배정 상태로 풀에 등록) ─────
+    if (action === "joinLesson") {
+      const lessonId = body.lessonId as string;
       const studentName = (body.studentName as string)?.trim();
 
       if (!studentName)
         return json({ error: "이름을 입력하세요." }, 400);
 
-      const { data: group, error: e1 } = await supabase
+      const { data: lesson } = await supabase
+        .from("lessons")
+        .select("*")
+        .eq("id", lessonId)
+        .maybeSingle();
+      if (!lesson)
+        return json({ error: "수업을 찾을 수 없습니다." }, 404);
+
+      // 동일 lesson 동일 이름 이미 있으면 그 row 반환 (재입장 허용)
+      const { data: existing } = await supabase
+        .from("members")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .eq("student_name", studentName)
+        .maybeSingle();
+
+      if (existing) return json({ member: existing, lesson });
+
+      const { data: member, error } = await supabase
+        .from("members")
+        .insert({
+          lesson_id: lessonId,
+          student_name: studentName,
+          group_id: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      return json({ member, lesson });
+    }
+
+    // ───── 학생: 본인 멤버십 상태 조회 (대기 화면 폴링·검증용) ─────
+    if (action === "getMyMembership") {
+      const lessonId = body.lessonId as string;
+      const studentName = (body.studentName as string)?.trim();
+      if (!lessonId || !studentName)
+        return json({ error: "lessonId 또는 이름이 누락되었습니다." }, 400);
+
+      const { data: member } = await supabase
+        .from("members")
+        .select("*")
+        .eq("lesson_id", lessonId)
+        .eq("student_name", studentName)
+        .maybeSingle();
+
+      return json({ member: member || null });
+    }
+
+    // ───── 교사: 학생을 모둠에 배정 ─────
+    if (action === "assignToGroup") {
+      const memberId = body.memberId as string;
+      const groupId = body.groupId as string;
+
+      const { data: group } = await supabase
         .from("groups")
         .select("*")
         .eq("id", groupId)
-        .single();
-      if (e1 || !group)
-        return json({ error: "모둠을 찾을 수 없습니다." }, 404);
+        .maybeSingle();
+      if (!group) return json({ error: "모둠을 찾을 수 없습니다." }, 404);
 
       const { data: existingMembers } = await supabase
         .from("members")
-        .select("*")
+        .select("id")
         .eq("group_id", groupId);
 
-      const already = (existingMembers || []).find(
-        (m) => m.student_name === studentName
-      );
-
-      if (
-        !already &&
-        (existingMembers || []).length >= group.capacity
-      ) {
-        return json({ error: "모둠 정원이 가득 찼습니다." }, 400);
+      if ((existingMembers || []).length >= group.capacity) {
+        return json({ error: `${group.name} 정원이 가득 찼습니다.` }, 400);
       }
 
-      if (!already) {
-        const { error: e2 } = await supabase.from("members").insert({
-          group_id: groupId,
-          student_name: studentName,
-        });
-        if (e2) throw e2;
-      }
+      const { error: e1 } = await supabase
+        .from("members")
+        .update({ group_id: groupId })
+        .eq("id", memberId);
+      if (e1) throw e1;
 
-      // 첫 입장 시 환영 메시지 자동 생성 (모둠 첫 번째 멤버일 때만)
-      const { data: msgCount } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("group_id", groupId);
+      // 모둠에 첫 멤버 배정 시 환영 메시지 자동 삽입
+      await ensureWelcomeMessage(supabase, groupId);
 
-      const { count } = (msgCount as unknown as { count: number }) || {
-        count: 0,
-      };
-      if (!count) {
-        const { data: lesson } = await supabase
-          .from("lessons")
+      return json({ ok: true });
+    }
+
+    // ───── 교사: 학생 배정 해제 (다시 풀로) ─────
+    if (action === "unassignFromGroup") {
+      const memberId = body.memberId as string;
+      const { error } = await supabase
+        .from("members")
+        .update({ group_id: null })
+        .eq("id", memberId);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    // ───── 교사: 자동 배정 (정원 맞춰 균등 분배) ─────
+    if (action === "autoAssign") {
+      const lessonId = body.lessonId as string;
+
+      const [{ data: groups }, { data: allMembers }] = await Promise.all([
+        supabase
+          .from("groups")
           .select("*")
-          .eq("id", group.lesson_id)
-          .single();
-        if (lesson) {
-          await supabase.from("messages").insert({
-            group_id: groupId,
-            role: "assistant",
-            sender_name: lesson.persona_name,
-            content: `안녕, 나는 ${lesson.persona_name}야. 이 수업에서 너희 모둠과 함께 활동하는 가상의 AI 다문화 동료야. 나는 실제 특정 문화를 대표하지 않지만, 활동에 참여하면서 언어, 문화, 소속감과 관련된 어려움이나 강점을 함께 이야기해볼 수 있어. 먼저 우리 모둠 활동 주제를 듣고, 내가 어떤 도움을 받으면 좋을지 함께 생각해보자.`,
-          });
+          .eq("lesson_id", lessonId)
+          .order("position"),
+        supabase.from("members").select("*").eq("lesson_id", lessonId),
+      ]);
+
+      const unassigned = (allMembers || []).filter((m) => !m.group_id);
+      // 그룹별 현재 인원 카운트
+      const counts = new Map<string, number>();
+      for (const g of groups || []) counts.set(g.id, 0);
+      for (const m of allMembers || []) {
+        if (m.group_id && counts.has(m.group_id)) {
+          counts.set(m.group_id, (counts.get(m.group_id) || 0) + 1);
         }
       }
 
-      return json({ ok: true });
+      // 셔플
+      const shuffled = [...unassigned].sort(() => Math.random() - 0.5);
+
+      const assignments: { memberId: string; groupId: string }[] = [];
+      const newWelcomeNeeded = new Set<string>();
+
+      for (const member of shuffled) {
+        // 현재 인원이 가장 적고 정원 미만인 그룹 선택
+        const candidate = (groups || [])
+          .filter((g) => (counts.get(g.id) || 0) < g.capacity)
+          .sort(
+            (a, b) => (counts.get(a.id) || 0) - (counts.get(b.id) || 0)
+          )[0];
+
+        if (!candidate) break; // 모든 그룹 정원 가득
+
+        if ((counts.get(candidate.id) || 0) === 0) {
+          newWelcomeNeeded.add(candidate.id);
+        }
+        assignments.push({ memberId: member.id, groupId: candidate.id });
+        counts.set(candidate.id, (counts.get(candidate.id) || 0) + 1);
+      }
+
+      // 일괄 업데이트
+      for (const a of assignments) {
+        await supabase
+          .from("members")
+          .update({ group_id: a.groupId })
+          .eq("id", a.memberId);
+      }
+
+      for (const groupId of newWelcomeNeeded) {
+        await ensureWelcomeMessage(supabase, groupId);
+      }
+
+      return json({
+        assigned: assignments.length,
+        leftover: unassigned.length - assignments.length,
+      });
     }
 
     // ───── 학생: 모둠 상태 풀 fetch (초기 로드) ─────

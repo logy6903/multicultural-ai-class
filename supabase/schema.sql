@@ -22,20 +22,23 @@ create table if not exists public.groups (
   id              text primary key,
   lesson_id       text not null references public.lessons(id) on delete cascade,
   name            text not null,
-  capacity        integer not null default 4 check (capacity between 1 and 12),
+  capacity        integer not null default 4 check (capacity between 1 and 5),
   position        integer not null default 0,
   created_at      timestamptz not null default now()
 );
 create index if not exists groups_lesson_idx on public.groups(lesson_id, position);
 
 -- ───────────────── members (학생 입장) ─────────────────
+-- 학생은 먼저 lesson 에 입장(미배정 상태) → 교사가 모둠으로 배정
 create table if not exists public.members (
   id              uuid primary key default gen_random_uuid(),
-  group_id        text not null references public.groups(id) on delete cascade,
+  lesson_id       text not null references public.lessons(id) on delete cascade,
+  group_id        text references public.groups(id) on delete set null,
   student_name    text not null,
   joined_at       timestamptz not null default now(),
-  unique (group_id, student_name)
+  unique (lesson_id, student_name)
 );
+create index if not exists members_lesson_idx on public.members(lesson_id);
 create index if not exists members_group_idx on public.members(group_id);
 
 -- ───────────────── messages (모둠 단위 채팅) ─────────────────

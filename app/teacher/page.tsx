@@ -24,8 +24,10 @@ type Group = {
 
 type Member = {
   id: string;
-  group_id: string;
+  lesson_id: string;
+  group_id: string | null;
   student_name: string;
+  joined_at: string;
 };
 
 type Role = {
@@ -55,6 +57,7 @@ export default function TeacherPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [groups, setGroups] = useState<GroupView[]>([]);
+  const [unassigned, setUnassigned] = useState<Member[]>([]);
 
   const [title, setTitle] = useState("AI 다문화 동료와 함께하는 모둠활동");
   const [topic, setTopic] = useState("모두가 참여할 수 있는 학교 축제 만들기");
@@ -65,6 +68,12 @@ export default function TeacherPage() {
   const [personaType, setPersonaType] = useState("language");
 
   const [error, setError] = useState("");
+  const [savedFlash, setSavedFlash] = useState("");
+
+  function flash(msg: string) {
+    setSavedFlash(msg);
+    setTimeout(() => setSavedFlash(""), 1800);
+  }
 
   async function loadLessons() {
     try {
@@ -80,6 +89,7 @@ export default function TeacherPage() {
       const data = await api("getLessonDashboard", { lessonId });
       setSelectedLesson(data.lesson);
       setGroups(data.groups);
+      setUnassigned(data.unassigned || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류");
     }
@@ -142,16 +152,59 @@ export default function TeacherPage() {
     }
   }
 
+  async function assignMember(memberId: string, groupId: string) {
+    if (!selectedLesson || !groupId) return;
+    try {
+      await api("assignToGroup", { memberId, groupId });
+      flash("배정 완료");
+      await refreshDashboard(selectedLesson.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류");
+    }
+  }
+
+  async function unassignMember(memberId: string) {
+    if (!selectedLesson) return;
+    try {
+      await api("unassignFromGroup", { memberId });
+      flash("배정 해제");
+      await refreshDashboard(selectedLesson.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류");
+    }
+  }
+
+  async function autoAssignAll() {
+    if (!selectedLesson) return;
+    if (
+      !confirm(
+        "미배정 학생을 정원이 남은 모둠에 무작위로 분배합니다. 진행할까요?"
+      )
+    )
+      return;
+    try {
+      const res = await api("autoAssign", { lessonId: selectedLesson.id });
+      flash(
+        `자동 배정 완료: ${res.assigned}명 배정${
+          res.leftover ? ` (정원 부족 ${res.leftover}명 잔여)` : ""
+        }`
+      );
+      await refreshDashboard(selectedLesson.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "오류");
+    }
+  }
+
   useEffect(() => {
     loadLessons();
   }, []);
 
-  // 30초 폴링으로 학생 활동 현황 갱신
+  // 5초 폴링 — 학생 입장이 늘어나는 걸 빠르게 확인
   useEffect(() => {
     if (!selectedLesson) return;
     const id = setInterval(() => {
       refreshDashboard(selectedLesson.id);
-    }, 30000);
+    }, 5000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLesson?.id]);
@@ -173,12 +226,19 @@ export default function TeacherPage() {
               교사용 수업 관리
             </h1>
           </div>
-          <button
-            onClick={loadLessons}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-          >
-            목록 새로고침
-          </button>
+          <div className="flex items-center gap-2">
+            {savedFlash && (
+              <span className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                {savedFlash}
+              </span>
+            )}
+            <button
+              onClick={loadLessons}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              목록 새로고침
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -275,7 +335,7 @@ export default function TeacherPage() {
             </div>
           </section>
 
-          {/* 우: 모둠 구성 + 활동 현황 */}
+          {/* 우: 모둠 구성 + 입장 학생 + 활동 현황 */}
           <section className="space-y-6">
             {!selectedLesson && (
               <div className="rounded-3xl bg-white p-12 text-center shadow-sm">
@@ -308,9 +368,10 @@ export default function TeacherPage() {
                   </div>
                 </div>
 
+                {/* 모둠 구성 (이름·정원 편집) */}
                 <div className="rounded-3xl bg-white p-6 shadow-sm">
                   <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold">모둠 구성</h2>
+                    <h2 className="text-xl font-bold">모둠 정의</h2>
                     <button
                       onClick={addGroup}
                       className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
@@ -337,20 +398,78 @@ export default function TeacherPage() {
                   </div>
                 </div>
 
+                {/* 입장 학생 + 모둠 배정 */}
                 <div className="rounded-3xl bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold">모둠 활동 현황</h2>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-xl font-bold">입장 학생 / 모둠 구성</h2>
+                      <p className="mt-1 text-xs text-slate-500">
+                        학생이 코드+이름으로 입장하면 아래 미배정에 나타납니다.
+                        교사가 모둠에 배정해야 학생은 활동방으로 진입합니다.
+                      </p>
+                    </div>
                     <button
-                      onClick={() => refreshDashboard(selectedLesson.id)}
-                      className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold hover:bg-slate-200"
+                      onClick={autoAssignAll}
+                      disabled={unassigned.length === 0 || groups.length === 0}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
-                      새로고침
+                      자동 배정 ({unassigned.length}명 대기)
                     </button>
                   </div>
 
+                  {/* 미배정 풀 */}
+                  <div className="mb-5 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-4">
+                    <p className="mb-3 text-xs font-bold text-amber-900">
+                      미배정 학생 ({unassigned.length}명)
+                    </p>
+                    {unassigned.length === 0 ? (
+                      <p className="text-xs text-amber-700">
+                        모두 배정되었습니다.
+                      </p>
+                    ) : (
+                      <ul className="grid gap-2 md:grid-cols-2">
+                        {unassigned.map((m) => (
+                          <li
+                            key={m.id}
+                            className="flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm"
+                          >
+                            <span className="flex-1 truncate text-sm font-semibold text-slate-900">
+                              {m.student_name}
+                            </span>
+                            <select
+                              className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  assignMember(m.id, e.target.value);
+                                }
+                              }}
+                            >
+                              <option value="">배정...</option>
+                              {groups.map((g) => {
+                                const full = g.members.length >= g.capacity;
+                                return (
+                                  <option
+                                    key={g.id}
+                                    value={g.id}
+                                    disabled={full}
+                                  >
+                                    {g.name} ({g.members.length}/{g.capacity}
+                                    {full ? " · 가득" : ""})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* 모둠별 멤버 */}
                   {groups.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                      모둠이 없습니다.
+                      모둠을 먼저 추가하세요.
                     </p>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2">
@@ -361,33 +480,52 @@ export default function TeacherPage() {
                         >
                           <div className="mb-2 flex items-center justify-between">
                             <h3 className="font-bold">{g.name}</h3>
-                            <span className="text-xs text-slate-500">
+                            <span
+                              className={`text-xs ${
+                                g.members.length >= g.capacity
+                                  ? "font-bold text-rose-600"
+                                  : "text-slate-500"
+                              }`}
+                            >
                               {g.members.length}/{g.capacity}명
                             </span>
                           </div>
-
-                          <p className="mb-1 text-xs font-bold text-slate-700">
-                            입장 학생
-                          </p>
                           {g.members.length === 0 ? (
-                            <p className="mb-2 text-xs text-slate-400">없음</p>
+                            <p className="text-xs text-slate-400">
+                              미배정 상태
+                            </p>
                           ) : (
-                            <ul className="mb-2 list-inside list-disc text-xs text-slate-700">
+                            <ul className="space-y-1">
                               {g.members.map((m) => {
                                 const role = g.roles.find(
                                   (r) => r.student_name === m.student_name
                                 );
                                 return (
-                                  <li key={m.id}>
-                                    {m.student_name}
-                                    {role ? ` — ${role.role_name}` : ""}
+                                  <li
+                                    key={m.id}
+                                    className="flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 text-xs"
+                                  >
+                                    <span className="flex-1 truncate">
+                                      {m.student_name}
+                                      {role && (
+                                        <span className="ml-1 text-slate-500">
+                                          — {role.role_name}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <button
+                                      onClick={() => unassignMember(m.id)}
+                                      title="배정 해제"
+                                      className="rounded px-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                                    >
+                                      ×
+                                    </button>
                                   </li>
                                 );
                               })}
                             </ul>
                           )}
-
-                          <p className="text-xs text-slate-600">
+                          <p className="mt-2 text-[11px] text-slate-500">
                             성찰문 제출 {g.reflectionCount}명
                           </p>
                         </article>
@@ -447,7 +585,7 @@ function GroupRow({
       <input
         type="number"
         min={1}
-        max={12}
+        max={5}
         className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
         value={capacity}
         onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 4)}
