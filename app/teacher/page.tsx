@@ -104,10 +104,14 @@ export default function TeacherPage() {
   const [viewingStudent, setViewingStudent] = useState<Member | null>(null);
   const [viewingGroupChat, setViewingGroupChat] = useState<string | null>(null);
 
-  const [title, setTitle] = useState("AI 다문화 동료와 함께하는 모둠활동");
-  const [topic, setTopic] = useState("모두가 참여할 수 있는 학교 축제 만들기");
+  const [title, setTitle] = useState(
+    "우리 학교 다문화 학생 진로상담 매뉴얼"
+  );
+  const [topic, setTopic] = useState(
+    "우리 학교 다문화 배경 학생이 진로를 찾는 과정에서 마주하는 어려움을 줄이고, 선생님이 따라쓸 수 있는 진로상담 가이드라인 5가지를 만든다."
+  );
   const [objective, setObjective] = useState(
-    "AI 다문화 동료의 필요와 강점을 파악하고 포용적인 협력 방안을 설계한다."
+    "다문화 학생의 진로 경험을 본인 시각에서 듣고, 학교 진로상담 절차를 그 경험을 기반으로 다시 설계한다."
   );
 
   const [error, setError] = useState("");
