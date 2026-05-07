@@ -20,6 +20,8 @@ type Group = {
   name: string;
   capacity: number;
   position: number;
+  persona_type: "language" | "culture" | "belonging";
+  persona_name: string;
 };
 
 type Member = {
@@ -132,10 +134,16 @@ export default function TeacherPage() {
 
   async function updateGroup(
     groupId: string,
-    patch: { name?: string; capacity?: number }
+    patch: {
+      name?: string;
+      capacity?: number;
+      personaName?: string;
+      personaType?: string;
+    }
   ) {
     try {
       await api("updateGroup", { groupId, ...patch });
+      if (selectedLesson) await refreshDashboard(selectedLesson.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류");
     }
@@ -347,79 +355,53 @@ export default function TeacherPage() {
 
             {selectedLesson && (
               <>
-                <div className="rounded-3xl bg-indigo-50 p-6">
-                  <p className="mb-2 text-xs font-semibold text-indigo-600">
-                    학생 입장 안내
-                  </p>
-                  <h2 className="mb-3 text-2xl font-bold text-slate-900">
-                    {selectedLesson.title}
-                  </h2>
-                  <div className="grid gap-3 text-sm md:grid-cols-2">
-                    <div>
-                      <p className="text-xs text-indigo-700">수업 코드</p>
-                      <p className="font-mono text-base font-bold text-indigo-900">
-                        {selectedLesson.id}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-indigo-700">학생 접속 주소</p>
-                      <p className="break-all text-indigo-900">{studentUrl}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 모둠 구성 (이름·정원 편집) */}
-                <div className="rounded-3xl bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-bold">모둠 정의</h2>
-                    <button
-                      onClick={addGroup}
-                      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                    >
-                      + 모둠 추가
-                    </button>
-                  </div>
-
-                  {groups.length === 0 && (
-                    <p className="text-sm text-slate-500">
-                      모둠이 없습니다. "+모둠 추가" 로 시작하세요.
+                {/* 학생 입장 안내 (컴팩트) */}
+                <div className="rounded-2xl bg-indigo-50 px-5 py-4">
+                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                    <p className="text-xs font-semibold text-indigo-600">
+                      {selectedLesson.title}
                     </p>
-                  )}
-
-                  <div className="space-y-2">
-                    {groups.map((g) => (
-                      <GroupRow
-                        key={g.id}
-                        group={g}
-                        onUpdate={(patch) => updateGroup(g.id, patch)}
-                        onDelete={() => deleteGroup(g.id)}
-                      />
-                    ))}
+                    <p className="font-mono text-sm font-bold text-indigo-900">
+                      코드 · {selectedLesson.id}
+                    </p>
+                    <p className="break-all text-xs text-indigo-700">
+                      {studentUrl}
+                    </p>
                   </div>
                 </div>
 
-                {/* 입장 학생 + 모둠 배정 */}
+                {/* 모둠 구성창 (한 덩어리) */}
                 <div className="rounded-3xl bg-white p-6 shadow-sm">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h2 className="text-xl font-bold">입장 학생 / 모둠 구성</h2>
-                      <p className="mt-1 text-xs text-slate-500">
-                        학생이 코드+이름으로 입장하면 아래 미배정에 나타납니다.
-                        교사가 모둠에 배정해야 학생은 활동방으로 진입합니다.
+                      <h2 className="text-xl font-bold">모둠 구성</h2>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        학생이 코드+이름으로 입장하면 미배정 풀에 나타납니다.
+                        모둠별로 다른 AI 페르소나를 설정할 수 있습니다.
                       </p>
                     </div>
-                    <button
-                      onClick={autoAssignAll}
-                      disabled={unassigned.length === 0 || groups.length === 0}
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      자동 배정 ({unassigned.length}명 대기)
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addGroup}
+                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                      >
+                        + 모둠 추가
+                      </button>
+                      <button
+                        onClick={autoAssignAll}
+                        disabled={
+                          unassigned.length === 0 || groups.length === 0
+                        }
+                        className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        자동 배정 ({unassigned.length}명)
+                      </button>
+                    </div>
                   </div>
 
                   {/* 미배정 풀 */}
-                  <div className="mb-5 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-4">
-                    <p className="mb-3 text-xs font-bold text-amber-900">
+                  <div className="mb-5 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-3">
+                    <p className="mb-2 text-xs font-bold text-amber-900">
                       미배정 학생 ({unassigned.length}명)
                     </p>
                     {unassigned.length === 0 ? (
@@ -427,13 +409,13 @@ export default function TeacherPage() {
                         모두 배정되었습니다.
                       </p>
                     ) : (
-                      <ul className="grid gap-2 md:grid-cols-2">
+                      <ul className="flex flex-wrap gap-2">
                         {unassigned.map((m) => (
                           <li
                             key={m.id}
-                            className="flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm"
+                            className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 shadow-sm"
                           >
-                            <span className="flex-1 truncate text-sm font-semibold text-slate-900">
+                            <span className="text-sm font-semibold text-slate-900">
                               {m.student_name}
                             </span>
                             <select
@@ -445,7 +427,7 @@ export default function TeacherPage() {
                                 }
                               }}
                             >
-                              <option value="">배정...</option>
+                              <option value="">→ 모둠</option>
                               {groups.map((g) => {
                                 const full = g.members.length >= g.capacity;
                                 return (
@@ -466,69 +448,21 @@ export default function TeacherPage() {
                     )}
                   </div>
 
-                  {/* 모둠별 멤버 */}
+                  {/* 모둠 카드 */}
                   {groups.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                      모둠을 먼저 추가하세요.
+                      모둠이 없습니다. "+모둠 추가" 로 시작하세요.
                     </p>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2">
                       {groups.map((g) => (
-                        <article
+                        <GroupCard
                           key={g.id}
-                          className="rounded-2xl border border-slate-200 p-4"
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <h3 className="font-bold">{g.name}</h3>
-                            <span
-                              className={`text-xs ${
-                                g.members.length >= g.capacity
-                                  ? "font-bold text-rose-600"
-                                  : "text-slate-500"
-                              }`}
-                            >
-                              {g.members.length}/{g.capacity}명
-                            </span>
-                          </div>
-                          {g.members.length === 0 ? (
-                            <p className="text-xs text-slate-400">
-                              미배정 상태
-                            </p>
-                          ) : (
-                            <ul className="space-y-1">
-                              {g.members.map((m) => {
-                                const role = g.roles.find(
-                                  (r) => r.student_name === m.student_name
-                                );
-                                return (
-                                  <li
-                                    key={m.id}
-                                    className="flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 text-xs"
-                                  >
-                                    <span className="flex-1 truncate">
-                                      {m.student_name}
-                                      {role && (
-                                        <span className="ml-1 text-slate-500">
-                                          — {role.role_name}
-                                        </span>
-                                      )}
-                                    </span>
-                                    <button
-                                      onClick={() => unassignMember(m.id)}
-                                      title="배정 해제"
-                                      className="rounded px-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                                    >
-                                      ×
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                          <p className="mt-2 text-[11px] text-slate-500">
-                            성찰문 제출 {g.reflectionCount}명
-                          </p>
-                        </article>
+                          group={g}
+                          onUpdate={(patch) => updateGroup(g.id, patch)}
+                          onDelete={() => deleteGroup(g.id)}
+                          onUnassign={unassignMember}
+                        />
                       ))}
                     </div>
                   )}
@@ -557,51 +491,148 @@ function Field({
   );
 }
 
-function GroupRow({
+function GroupCard({
   group,
   onUpdate,
   onDelete,
+  onUnassign,
 }: {
   group: GroupView;
-  onUpdate: (patch: { name?: string; capacity?: number }) => void;
+  onUpdate: (patch: {
+    name?: string;
+    capacity?: number;
+    personaName?: string;
+    personaType?: string;
+  }) => void;
   onDelete: () => void;
+  onUnassign: (memberId: string) => void;
 }) {
   const [name, setName] = useState(group.name);
   const [capacity, setCapacity] = useState(group.capacity);
+  const [personaName, setPersonaName] = useState(group.persona_name || "");
+  const [personaType, setPersonaType] = useState(
+    group.persona_type || "language"
+  );
 
   useEffect(() => {
     setName(group.name);
     setCapacity(group.capacity);
-  }, [group.name, group.capacity]);
+    setPersonaName(group.persona_name || "");
+    setPersonaType(group.persona_type || "language");
+  }, [
+    group.name,
+    group.capacity,
+    group.persona_name,
+    group.persona_type,
+  ]);
+
+  const full = group.members.length >= group.capacity;
 
   return (
-    <div className="grid items-center gap-2 rounded-xl border border-slate-200 p-2 md:grid-cols-[1fr_120px_auto_auto]">
-      <input
-        className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={() => name !== group.name && onUpdate({ name })}
-      />
-      <input
-        type="number"
-        min={1}
-        max={5}
-        className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        value={capacity}
-        onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 4)}
-        onBlur={() =>
-          capacity !== group.capacity && onUpdate({ capacity })
-        }
-      />
-      <span className="text-xs text-slate-500">
-        {group.members.length}/{group.capacity}명
-      </span>
-      <button
-        onClick={onDelete}
-        className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
-      >
-        삭제
-      </button>
-    </div>
+    <article className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3">
+      {/* 헤더: 이름 + 인원 + 삭제 */}
+      <div className="flex items-center gap-2">
+        <input
+          className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm font-bold"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => name !== group.name && onUpdate({ name })}
+        />
+        <span
+          className={`text-[11px] ${
+            full ? "font-bold text-rose-600" : "text-slate-500"
+          }`}
+        >
+          {group.members.length}/{group.capacity}
+        </span>
+        <button
+          onClick={onDelete}
+          title="모둠 삭제"
+          className="rounded-md px-1.5 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
+        >
+          삭제
+        </button>
+      </div>
+
+      {/* 정원 + AI 동료 */}
+      <div className="grid grid-cols-[64px_1fr_104px] gap-2">
+        <input
+          type="number"
+          min={1}
+          max={5}
+          title="정원"
+          className="rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+          value={capacity}
+          onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 4)}
+          onBlur={() =>
+            capacity !== group.capacity && onUpdate({ capacity })
+          }
+        />
+        <input
+          placeholder="AI 동료 이름 (예: 민하)"
+          className="rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+          value={personaName}
+          onChange={(e) => setPersonaName(e.target.value)}
+          onBlur={() =>
+            personaName !== (group.persona_name || "") &&
+            personaName.trim() &&
+            onUpdate({ personaName })
+          }
+        />
+        <select
+          title="페르소나 유형"
+          className="rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+          value={personaType}
+          onChange={(e) => {
+            const v = e.target.value;
+            setPersonaType(v as GroupView["persona_type"]);
+            if (v !== group.persona_type) onUpdate({ personaType: v });
+          }}
+        >
+          <option value="language">언어 적응형</option>
+          <option value="culture">문화 오해형</option>
+          <option value="belonging">소속감 고민형</option>
+        </select>
+      </div>
+
+      {/* 학생 */}
+      <div>
+        {group.members.length === 0 ? (
+          <p className="rounded-md bg-slate-50 px-2 py-1.5 text-[11px] text-slate-400">
+            아직 배정된 학생이 없습니다.
+          </p>
+        ) : (
+          <ul className="flex flex-wrap gap-1">
+            {group.members.map((m) => {
+              const role = group.roles.find(
+                (r) => r.student_name === m.student_name
+              );
+              return (
+                <li
+                  key={m.id}
+                  className="flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px]"
+                >
+                  <span className="font-semibold">{m.student_name}</span>
+                  {role && (
+                    <span className="text-slate-500">— {role.role_name}</span>
+                  )}
+                  <button
+                    onClick={() => onUnassign(m.id)}
+                    title="배정 해제"
+                    className="ml-0.5 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                  >
+                    ×
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <p className="text-[10px] text-slate-400">
+        성찰문 제출 {group.reflectionCount}명
+      </p>
+    </article>
   );
 }

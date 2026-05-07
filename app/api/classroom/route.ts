@@ -52,11 +52,13 @@ async function ensureWelcomeMessage(
     .maybeSingle();
   if (!lesson) return;
 
+  const personaName = group.persona_name || lesson.persona_name;
+
   await supabase.from("messages").insert({
     group_id: groupId,
     role: "assistant",
-    sender_name: lesson.persona_name,
-    content: `안녕, 나는 ${lesson.persona_name}야. 이 수업에서 너희 모둠과 함께 활동하는 가상의 AI 다문화 동료야. 나는 실제 특정 문화를 대표하지 않지만, 활동에 참여하면서 언어, 문화, 소속감과 관련된 어려움이나 강점을 함께 이야기해볼 수 있어. 먼저 우리 모둠 활동 주제를 듣고, 내가 어떤 도움을 받으면 좋을지 함께 생각해보자.`,
+    sender_name: personaName,
+    content: `안녕, 나는 ${personaName}야. 이 수업에서 너희 모둠과 함께 활동하는 가상의 AI 다문화 동료야. 나는 실제 특정 문화를 대표하지 않지만, 활동에 참여하면서 언어, 문화, 소속감과 관련된 어려움이나 강점을 함께 이야기해볼 수 있어. 먼저 우리 모둠 활동 주제를 듣고, 내가 어떤 도움을 받으면 좋을지 함께 생각해보자.`,
   });
 }
 
@@ -98,10 +100,10 @@ function buildSystemPrompt(
 ${group.name}
 
 [너의 이름]
-${lesson.persona_name}
+${group.persona_name || lesson.persona_name}
 
 [너의 페르소나]
-${PERSONA_PRESETS[lesson.persona_type]}
+${PERSONA_PRESETS[(group.persona_type as PersonaType) || lesson.persona_type]}
 
 [현재 모둠 역할 분담]
 ${roleSummary}
@@ -222,13 +224,16 @@ export async function POST(req: NextRequest) {
         .single();
       if (e1) throw e1;
 
-      // 기본 모둠 4개 자동 생성
+      // 기본 모둠 4개 자동 생성 — 모두 lesson 의 페르소나로 시작
+      // 교사는 이후 모둠별로 페르소나를 다르게 변경 가능
       const defaultGroups = [1, 2, 3, 4].map((n) => ({
         id: makeId("group"),
         lesson_id: id,
         name: `${n}모둠`,
         capacity: 4,
         position: n,
+        persona_type: lessonRow.persona_type,
+        persona_name: lessonRow.persona_name,
       }));
       const { error: e2 } = await supabase
         .from("groups")
@@ -257,7 +262,7 @@ export async function POST(req: NextRequest) {
       return json({ lesson, groups: groups || [] });
     }
 
-    // ───── 교사: 모둠 추가 ─────
+    // ───── 교사: 모둠 추가 (lesson 페르소나 상속) ─────
     if (action === "addGroup") {
       const lessonId = body.lessonId as string;
       const name = (body.name as string)?.trim() || "새 모둠";
@@ -266,12 +271,18 @@ export async function POST(req: NextRequest) {
         Math.max(1, parseInt(String(body.capacity ?? 4), 10) || 4)
       );
 
-      const { data: existing } = await supabase
-        .from("groups")
-        .select("position")
-        .eq("lesson_id", lessonId)
-        .order("position", { ascending: false })
-        .limit(1);
+      const [{ data: existing }, { data: lesson }] = await Promise.all([
+        supabase
+          .from("groups")
+          .select("position")
+          .eq("lesson_id", lessonId)
+          .order("position", { ascending: false })
+          .limit(1),
+        supabase.from("lessons").select("*").eq("id", lessonId).maybeSingle(),
+      ]);
+
+      if (!lesson)
+        return json({ error: "수업을 찾을 수 없습니다." }, 404);
 
       const nextPosition = existing?.[0]?.position
         ? existing[0].position + 1
@@ -285,6 +296,8 @@ export async function POST(req: NextRequest) {
           name,
           capacity,
           position: nextPosition,
+          persona_type: lesson.persona_type,
+          persona_name: lesson.persona_name,
         })
         .select()
         .single();
@@ -293,7 +306,7 @@ export async function POST(req: NextRequest) {
       return json({ group });
     }
 
-    // ───── 교사: 모둠 수정 ─────
+    // ───── 교사: 모둠 수정 (이름·정원·페르소나) ─────
     if (action === "updateGroup") {
       const groupId = body.groupId as string;
       const patch: Record<string, unknown> = {};
@@ -303,6 +316,15 @@ export async function POST(req: NextRequest) {
           5,
           Math.max(1, parseInt(String(body.capacity), 10) || 4)
         );
+      if (typeof body.personaName === "string" && body.personaName.trim()) {
+        patch.persona_name = (body.personaName as string).trim();
+      }
+      if (
+        typeof body.personaType === "string" &&
+        ["language", "culture", "belonging"].includes(body.personaType)
+      ) {
+        patch.persona_type = body.personaType;
+      }
 
       const { data: group, error } = await supabase
         .from("groups")
@@ -655,18 +677,20 @@ export async function POST(req: NextRequest) {
       });
       if (e1) throw e1;
 
-      // OpenAI 호출
+      // 모둠별 페르소나 우선 사용 (lesson 은 폴백)
+      const personaName = group.persona_name || lesson.persona_name;
+
       const aiText = await callOpenAI(
         buildSystemPrompt(lesson, group, roles || []),
         (history || []) as Message[],
         text,
-        lesson.persona_name
+        personaName
       );
 
       const { error: e2 } = await supabase.from("messages").insert({
         group_id: groupId,
         role: "assistant",
-        sender_name: lesson.persona_name,
+        sender_name: personaName,
         content: aiText,
       });
       if (e2) throw e2;

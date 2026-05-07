@@ -18,12 +18,15 @@ create table if not exists public.lessons (
 );
 
 -- ───────────────── groups (모둠) ─────────────────
+-- 모둠별로 서로 다른 AI 다문화 동료 페르소나를 가질 수 있음
 create table if not exists public.groups (
   id              text primary key,
   lesson_id       text not null references public.lessons(id) on delete cascade,
   name            text not null,
   capacity        integer not null default 4 check (capacity between 1 and 5),
   position        integer not null default 0,
+  persona_type    text not null default 'language' check (persona_type in ('language','culture','belonging')),
+  persona_name    text not null default '민하',
   created_at      timestamptz not null default now()
 );
 create index if not exists groups_lesson_idx on public.groups(lesson_id, position);

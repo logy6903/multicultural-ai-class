@@ -16,6 +16,8 @@ export type Group = {
   name: string;
   capacity: number;
   position: number;
+  persona_type: PersonaType;
+  persona_name: string;
   created_at: string;
 };
 

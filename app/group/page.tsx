@@ -19,6 +19,8 @@ type Group = {
   name: string;
   capacity: number;
   position: number;
+  persona_type?: string;
+  persona_name?: string;
 };
 
 type Member = {
@@ -565,7 +567,10 @@ export default function GroupPage() {
                 입니다. 도움을 받기도 하지만, 동시에 새로운 관점을 모둠에
                 제공할 수 있는 동료입니다.
               </div>
-              <Field label="AI 동료 이름" value={lesson.persona_name} />
+              <Field
+                label="AI 동료 이름"
+                value={group.persona_name || lesson.persona_name}
+              />
               <Field label="수업 주제" value={lesson.topic} />
               <Field label="학습 목표" value={lesson.objective} />
               <div className="mt-2">
@@ -602,7 +607,7 @@ export default function GroupPage() {
                   AI 다문화 동료
                 </span>
                 <span className="text-xs font-bold text-slate-900">
-                  {lesson.persona_name}
+                  {group.persona_name || lesson.persona_name}
                 </span>
                 <span className="ml-auto text-[11px] text-slate-500">
                   모둠 공유 · 실시간
@@ -636,7 +641,9 @@ export default function GroupPage() {
                   >
                     <p className="mb-0.5 text-[10px] font-bold opacity-70">
                       {m.role === "assistant"
-                        ? lesson.persona_name
+                        ? m.sender_name ||
+                          group.persona_name ||
+                          lesson.persona_name
                         : m.sender_name || "익명"}
                       {m.sender_name === studentName ? " (나)" : ""}
                     </p>

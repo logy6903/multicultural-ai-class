@@ -67,3 +67,28 @@ alter table public.groups
   drop constraint if exists groups_capacity_check;
 alter table public.groups
   add constraint groups_capacity_check check (capacity between 1 and 5);
+
+-- 8) 모둠별 페르소나 — 각 모둠이 서로 다른 AI 동료를 가질 수 있도록
+alter table public.groups
+  add column if not exists persona_type text;
+alter table public.groups
+  add column if not exists persona_name text;
+
+-- 8a) 기존 행은 lesson 의 페르소나로 백필
+update public.groups g
+set persona_type = coalesce(g.persona_type, l.persona_type),
+    persona_name = coalesce(g.persona_name, l.persona_name)
+from public.lessons l
+where l.id = g.lesson_id
+  and (g.persona_type is null or g.persona_name is null);
+
+-- 8b) NOT NULL + CHECK
+alter table public.groups
+  alter column persona_type set not null,
+  alter column persona_name set not null;
+
+alter table public.groups
+  drop constraint if exists groups_persona_type_check;
+alter table public.groups
+  add constraint groups_persona_type_check
+  check (persona_type in ('language','culture','belonging'));
