@@ -336,19 +336,23 @@ export default function TeacherPage() {
 
             {selectedLesson && (
               <>
-                {/* 학생 입장 안내 (컴팩트) */}
-                <div className="rounded-2xl bg-indigo-50 px-5 py-4">
-                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                    <p className="text-xs font-semibold text-indigo-600">
-                      {selectedLesson.title}
-                    </p>
-                    <p className="font-mono text-sm font-bold text-indigo-900">
-                      코드 · {selectedLesson.id}
-                    </p>
-                    <p className="break-all text-xs text-indigo-700">
-                      {studentUrl}
-                    </p>
-                  </div>
+                {/* 학생 입장 안내 (한 줄) */}
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-indigo-50 px-4 py-3">
+                  <p className="text-sm font-bold text-slate-900">
+                    {selectedLesson.title}
+                  </p>
+                  <p className="font-mono text-xs font-bold text-indigo-900">
+                    코드 · {selectedLesson.id}
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(studentUrl);
+                      flash("학생 접속 링크 복사됨");
+                    }}
+                    className="ml-auto rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100"
+                  >
+                    학생 링크 복사
+                  </button>
                 </div>
 
                 {/* 모둠 구성창 (한 덩어리) */}
@@ -380,54 +384,84 @@ export default function TeacherPage() {
                     </div>
                   </div>
 
-                  {/* 미배정 풀 */}
-                  <div className="mb-5 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-3">
-                    <p className="mb-2 text-xs font-bold text-amber-900">
-                      미배정 학생 ({unassigned.length}명)
-                    </p>
-                    {unassigned.length === 0 ? (
-                      <p className="text-xs text-amber-700">
-                        모두 배정되었습니다.
-                      </p>
-                    ) : (
-                      <ul className="flex flex-wrap gap-2">
-                        {unassigned.map((m) => (
-                          <li
-                            key={m.id}
-                            className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 shadow-sm"
-                          >
-                            <span className="text-sm font-semibold text-slate-900">
-                              {m.student_name}
-                            </span>
-                            <select
-                              className="rounded-md border border-slate-200 px-2 py-1 text-xs"
-                              defaultValue=""
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  assignMember(m.id, e.target.value);
-                                }
-                              }}
-                            >
-                              <option value="">→ 모둠</option>
-                              {groups.map((g) => {
-                                const full = g.members.length >= g.capacity;
-                                return (
-                                  <option
-                                    key={g.id}
-                                    value={g.id}
-                                    disabled={full}
+                  {/* 전체 입장 학생 — 미배정·배정 한 자리에서 보기 */}
+                  {(() => {
+                    const allMembers: Member[] = [
+                      ...unassigned,
+                      ...groups.flatMap((g) => g.members),
+                    ];
+                    return (
+                      <div className="mb-5 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-3">
+                        <p className="mb-2 text-xs font-bold text-amber-900">
+                          전체 입장 학생 ({allMembers.length}명) · 미배정{" "}
+                          {unassigned.length}명
+                        </p>
+                        {allMembers.length === 0 ? (
+                          <p className="text-xs text-amber-700">
+                            아직 입장한 학생이 없습니다. 학생이 코드+이름으로
+                            입장하면 여기에 실시간으로 추가됩니다.
+                          </p>
+                        ) : (
+                          <ul className="flex flex-wrap gap-2">
+                            {allMembers.map((m) => {
+                              const currentGroup = m.group_id
+                                ? groups.find((g) => g.id === m.group_id)
+                                : null;
+                              return (
+                                <li
+                                  key={m.id}
+                                  className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 shadow-sm"
+                                >
+                                  <span className="text-sm font-semibold text-slate-900">
+                                    {m.student_name}
+                                  </span>
+                                  <span
+                                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                                      currentGroup
+                                        ? "bg-indigo-100 text-indigo-700"
+                                        : "bg-amber-200 text-amber-900"
+                                    }`}
                                   >
-                                    {g.name} ({g.members.length}/{g.capacity}
-                                    {full ? " · 가득" : ""})
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                                    {currentGroup ? currentGroup.name : "미배정"}
+                                  </span>
+                                  <select
+                                    className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+                                    value={m.group_id || ""}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      if (v === "") {
+                                        unassignMember(m.id);
+                                      } else if (v !== m.group_id) {
+                                        assignMember(m.id, v);
+                                      }
+                                    }}
+                                  >
+                                    <option value="">미배정</option>
+                                    {groups.map((g) => {
+                                      const full =
+                                        g.members.length >= g.capacity &&
+                                        g.id !== m.group_id;
+                                      return (
+                                        <option
+                                          key={g.id}
+                                          value={g.id}
+                                          disabled={full}
+                                        >
+                                          {g.name} ({g.members.length}/
+                                          {g.capacity}
+                                          {full ? " · 가득" : ""})
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* 모둠 카드 */}
                   {groups.length === 0 ? (
