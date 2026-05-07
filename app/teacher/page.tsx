@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getBrowserSupabase } from "@/lib/supabase";
 
 type Lesson = {
   id: string;
@@ -241,13 +242,46 @@ export default function TeacherPage() {
     loadLessons();
   }, []);
 
-  // 5초 폴링 — 학생 입장이 늘어나는 걸 빠르게 확인
+  // 선택한 수업의 변경을 Realtime 으로 즉시 반영
+  // members / role_assignments / reflections 변경 시 대시보드 재조회
   useEffect(() => {
     if (!selectedLesson) return;
-    const id = setInterval(() => {
-      refreshDashboard(selectedLesson.id);
-    }, 5000);
-    return () => clearInterval(id);
+    const lessonId = selectedLesson.id;
+    const supabase = getBrowserSupabase();
+
+    const refetch = () => refreshDashboard(lessonId);
+
+    const channel = supabase
+      .channel(`teacher-${lessonId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "members",
+          filter: `lesson_id=eq.${lessonId}`,
+        },
+        refetch
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "role_assignments" },
+        refetch
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reflections" },
+        refetch
+      )
+      .subscribe();
+
+    // 폴링 보조 (Realtime 누락 대비 — 3초)
+    const poll = setInterval(refetch, 3000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLesson?.id]);
 
